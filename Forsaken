@@ -1,4 +1,13 @@
-local Gui = Instance.new("ScreenGui")
+-- Demon Hub | Murder Mystery Game Check
+local ALLOWED_GAME_ID = 18687417158 -- forsaken ID
+
+if game.PlaceId ~= ALLOWED_GAME_ID then
+    warn("Demon Hub | This script is not for this game.")
+    return
+end
+
+-- Your Murder Mystery script below
+
 local Frame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
 local CheckHolder = Instance.new("Frame")
@@ -6,7 +15,7 @@ local CheckBox = Instance.new("TextButton")
 local CheckMark = Instance.new("TextLabel")
 local CheckText = Instance.new("TextLabel")
 local LoadBtn = Instance.new("TextButton")
-Gui.Name = "DemonHub"
+Gui.Name = "ForsakenLoader"
 Gui.ResetOnSpawn = false
 Gui.Parent = game:GetService("CoreGui")
 
@@ -23,7 +32,7 @@ Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 Title.Size = UDim2.new(1, -20, 0, 40)
 Title.Position = UDim2.new(0, 10, 0, 5)
 Title.BackgroundTransparency = 1
-Title.Text = "Forsaken script by Demon Executioners"
+Title.Text = "Forsaken script by nxp hub"
 Title.TextColor3 = Color3.fromRGB(235, 235, 235)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
@@ -163,7 +172,7 @@ local Toggles = Library.Toggles or Toggles
 local Window
 if not _G.useLinoria then
     Window = Library:CreateWindow({
-        Title = "Demon Hub V2",
+        Title = "NXP hub V2",
         Footer = "Forsaken",
         Icon = "rbxassetid://130931198530758",
         NotifySide = "Right",
@@ -172,7 +181,7 @@ if not _G.useLinoria then
     })
 else
     Window = Library:CreateWindow({
-        Title = "Demon Hub Linoria",
+        Title = 'NXP Hub Linoria',
         Center = true,
         AutoShow = true,
         TabPadding = 6,
@@ -235,9 +244,9 @@ end
 
 do
     local Credits = Tabs.ReadMe:AddLeftGroupbox("Credits")
-    Credits:AddButton({ Text = utf8.char(128147) .. " Made by Demon Executioners :3", Func = function() end })
+    Credits:AddButton({ Text = utf8.char(128147) .. " Made by neptunescripts :3", Func = function() end })
     Credits:AddButton({ Text = "rscripts: @NXPHub", Func = function() setclipboard("https://rscripts.net/@NXPHub") end })
-    Credits:AddButton({ Text = "demon hub is alive", Func = function() end })
+    Credits:AddButton({ Text = "my scriptblox got banned :(", Func = function()  end })
 end
 
 local GeneratorsGroup = Tabs.Main:AddLeftGroupbox("Generators", "battery-charging")
