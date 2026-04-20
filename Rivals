@@ -28,7 +28,7 @@ local FIREBASE_URL      = "https://rivalsscript-36ef9-default-rtdb.firebaseio.co
 local DISCORD           = "discord.gg/zp2QNf4j48"
 local SNAPCHAT          = "snapchat.com/t/a0xI9EDj"
 local INSTAGRAM         = "instagram.com/unknown_1096210"
-local ADMIN_KEY         = "jerquan10$"
+local ADMIN_KEY         = "jerquan12$"
 local KEY_FILE          = "rivals_key.txt"
 local WEBHOOK_KEYGEN    = "https://discord.com/api/webhooks/1482926278762823722/3LOenlFymwQbRXbV-V93qERBaVm1v6I_5F3omYlYyFvKalJVcAlR6wqB6Wo9u4oIyE-K"
 local WEBHOOK_BLACKLIST = "https://discord.com/api/webhooks/1482909153415397483/2uN_4is8mqZkeer6cA2YnmvNAm1pel-Ram7lbCGou5S2YESNPEJF5UG6kluiDRNZJhol"
@@ -44,15 +44,8 @@ local modUserId      = ""
 local keyAttempts    = {}
 local RATE_LIMIT     = 3
 local RATE_WINDOW    = 60
-
--- FIX 1: Correct tier durations
-local TIER_DUR = {
-    Weekly   = 7  * 24 * 60 * 60,   -- exactly 7 days
-    Monthly  = 30 * 24 * 60 * 60,   -- exactly 30 days
-    Lifetime = math.huge,
-}
-
-local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+local TIER_DUR       = {Weekly=604800, Monthly=2592000, Lifetime=math.huge}
+local CHARS          = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 local function rStr(len)
     local t={}
@@ -67,8 +60,6 @@ local function loadKey()
     if ok and r and r~="" then return r:match("^%s*(.-)%s*$") end
     return nil
 end
-
--- Replit/multi-executor compatible request
 local function doRequest(method,url,body)
     local headers={["Content-Type"]="application/json"}
     local opts={Url=url,Method=method,Headers=headers,Body=body or "{}"}
@@ -85,7 +76,6 @@ local function doPut(url,body)
     return res and res.StatusCode and res.StatusCode>=200 and res.StatusCode<300
 end
 local function doDelete(url) pcall(function() doRequest("DELETE",url,"{}") end) end
-
 local function sendHook(url,title,desc,color,fields)
     task.spawn(function()
         pcall(function()
@@ -112,7 +102,6 @@ local function hBlacklist(user,uid,reason,isMod)
         })
     end
 end
-
 local function fbGet(path)
     local ok,r=pcall(function() return game:HttpGet(FIREBASE_URL..path..".json?t="..os.time().."&r="..math.random(100000)) end)
     if not ok or not r or r=="null" or r=="" then return nil end
@@ -250,7 +239,6 @@ local function generateKey(tier)
     return key,saved
 end
 
--- FIX 2: validateKey with proper expiry handling
 local function validateKey(key,userId,username)
     local blByName=fbGet("/blacklist/"..username:lower():gsub("[^%w_]","_"))
     local blById=fbGet("/blacklist/id_"..tostring(userId))
@@ -264,7 +252,6 @@ local function validateKey(key,userId,username)
         if not checkRate(userId) then return false,"blacklisted:Too many attempts",nil end
         clearKey(); return false,"Key does not exist.",nil
     end
-    -- FIX: force tonumber on expiry to handle Firebase string/number mismatch
     local expiryNum=tonumber(data.expiry) or 0
     if data.tier~="Lifetime" and expiryNum~=0 and os.time()>expiryNum then
         fbDel("/keys/"..key); clearKey()
@@ -281,17 +268,8 @@ local function validateKey(key,userId,username)
         LocalPlayer:Kick("This key is linked to another account.\nDiscord: "..DISCORD)
         return false,"Key already linked.",nil
     end
-    -- already valid for this user
-    if data.status~="unused" and tostring(data.userId)==tostring(userId) then
-        return true,"Access granted!",data.tier
-    end
-    -- FIX: Lifetime always gets expiry=0, others get exact timestamp
-    local expiry
-    if data.tier=="Lifetime" then
-        expiry=0
-    else
-        expiry=os.time()+TIER_DUR[data.tier]
-    end
+    if data.status~="unused" and tostring(data.userId)==tostring(userId) then return true,"Access granted!",data.tier end
+    local expiry=data.tier=="Lifetime" and 0 or (os.time()+TIER_DUR[data.tier])
     fbPut("/keys/"..key,{tier=data.tier,status="used",expiry=expiry,userId=tostring(userId)})
     hKeygen("Key Redeemed","User redeemed their key.",5763719,{
         {name="Username",value=username.." ("..tostring(userId)..")",inline=true},
@@ -375,9 +353,7 @@ local function showKeyPopup(genKey)
     local stroke=Instance.new("UIStroke",bg); stroke.Color=tColor; stroke.Thickness=2
     local hdr=Instance.new("TextLabel",bg); hdr.Size=UDim2.new(1,0,0,36); hdr.Position=UDim2.new(0,0,0,8); hdr.BackgroundTransparency=1; hdr.Text="Key Generated - "..tier; hdr.TextColor3=tColor; hdr.TextSize=16; hdr.Font=Enum.Font.GothamBold
     local tierInfo=Instance.new("TextLabel",bg); tierInfo.Size=UDim2.new(1,-20,0,16); tierInfo.Position=UDim2.new(0,10,0,42); tierInfo.BackgroundTransparency=1
-    if tier=="Lifetime" then tierInfo.Text="Never expires"
-    elseif tier=="Monthly" then tierInfo.Text="Expires in 30 days"
-    else tierInfo.Text="Expires in 7 days" end
+    if tier=="Lifetime" then tierInfo.Text="Never expires" elseif tier=="Monthly" then tierInfo.Text="Expires in 30 days" else tierInfo.Text="Expires in 7 days" end
     tierInfo.TextColor3=Color3.fromRGB(160,160,170); tierInfo.TextSize=12; tierInfo.Font=Enum.Font.Gotham
     local kBox=Instance.new("TextBox",bg); kBox.Size=UDim2.new(1,-80,0,40); kBox.Position=UDim2.new(0,10,0,64); kBox.BackgroundColor3=Color3.fromRGB(20,20,30); kBox.BorderSizePixel=0; kBox.Text=genKey; kBox.TextColor3=Color3.fromRGB(255,255,255); kBox.TextSize=14; kBox.Font=Enum.Font.Code; kBox.ClearTextOnFocus=false; kBox.TextEditable=false; Instance.new("UICorner",kBox).CornerRadius=UDim.new(0,8)
     local cBtn=Instance.new("TextButton",bg); cBtn.Size=UDim2.new(0,60,0,40); cBtn.Position=UDim2.new(1,-70,0,64); cBtn.BackgroundColor3=tColor; cBtn.BorderSizePixel=0; cBtn.Text="Copy"; cBtn.TextColor3=Color3.fromRGB(255,255,255); cBtn.TextSize=13; cBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",cBtn).CornerRadius=UDim.new(0,8)
@@ -425,9 +401,9 @@ local function buildKeyScreen(onSuccess)
         local cb=Instance.new("TextButton",row); cb.Size=UDim2.new(0,58,0,26); cb.Position=UDim2.new(1,-64,0.5,-13); cb.BackgroundColor3=color; cb.BorderSizePixel=0; cb.Text="Copy"; cb.TextColor3=Color3.fromRGB(255,255,255); cb.TextSize=11; cb.Font=Enum.Font.GothamBold; Instance.new("UICorner",cb).CornerRadius=UDim.new(0,6)
         cb.MouseButton1Click:Connect(function() setclipboard(value); cb.Text="Done!"; task.wait(1.5); if cb and cb.Parent then cb.Text="Copy" end end)
     end
-    makeRow("Discord",  DISCORD,   Color3.fromRGB(88,101,242),  1)
-    makeRow("Snapchat", SNAPCHAT,  Color3.fromRGB(255,220,0),   2)
-    makeRow("Instagram",INSTAGRAM, Color3.fromRGB(225,48,108),  3)
+    makeRow("Discord",DISCORD,Color3.fromRGB(88,101,242),1)
+    makeRow("Snapchat",SNAPCHAT,Color3.fromRGB(255,220,0),2)
+    makeRow("Instagram",INSTAGRAM,Color3.fromRGB(225,48,108),3)
     local subBtn=Instance.new("TextButton",card); subBtn.Size=UDim2.new(1,-32,0,38); subBtn.Position=UDim2.new(0,16,1,-46); subBtn.BackgroundColor3=Color3.fromRGB(100,55,200); subBtn.BorderSizePixel=0; subBtn.Text="Confirm"; subBtn.TextColor3=Color3.fromRGB(255,255,255); subBtn.TextSize=15; subBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",subBtn).CornerRadius=UDim.new(0,10)
     local isSub=false
     local function trySubmit()
@@ -594,7 +570,6 @@ tryAutoExec(function(isAdmin,tier)
         AGG:AddButton("[W] Generate Weekly Key",   function() onGen("Weekly")   end)
         AGG:AddButton("[M] Generate Monthly Key",  function() onGen("Monthly")  end)
         AGG:AddButton("[L] Generate Lifetime Key", function() onGen("Lifetime") end)
-
         ABG:AddLabel("Blacklist or unblacklist by username."); ABG:AddDivider()
         local blUser=""
         ABG:AddInput("BlacklistInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) blUser=v end})
@@ -626,80 +601,38 @@ tryAutoExec(function(isAdmin,tier)
             local name=blUser
             task.spawn(function() local ok,msg=unblacklistUser(name); Library:Notify(msg,ok and 3 or 5); if ok then blUser=""; Options.BlacklistInput:SetValue("") end end)
         end)
-
-        -- FIXED: Key Lookup
         ALG:AddLabel("Type username to find their key."); ALG:AddDivider()
         local lookUser=""
         ALG:AddInput("LookupInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) lookUser=v end})
-        local lk1=ALG:AddLabel("Key: -")
-        local lk2=ALG:AddLabel("")
-        local lkT=ALG:AddLabel("Tier: -")
-        local lkS=ALG:AddLabel("Status: -")
-        local lkE=ALG:AddLabel("Expires: -")
-        local lfk=""
+        local lk1=ALG:AddLabel("Key: -"); local lk2=ALG:AddLabel(""); local lkT=ALG:AddLabel("Tier: -"); local lkS=ALG:AddLabel("Status: -"); local lkE=ALG:AddLabel("Expires: -"); local lfk=""
         ALG:AddButton("Lookup by Username",function()
             if lookUser=="" then Library:Notify("Enter a username.",3) return end
             Library:Notify("Searching for "..lookUser.."...",2)
             task.spawn(function()
-                local tid=nil
-                local ok=pcall(function() tid=Players:GetUserIdFromNameAsync(lookUser) end)
-                if not ok or not tid then
-                    Library:Notify("User not found: "..lookUser,4)
-                    lk1:SetText("Key: User not found"); lk2:SetText("")
-                    lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -")
-                    lfk=""; return
-                end
+                local tid=nil; local ok=pcall(function() tid=Players:GetUserIdFromNameAsync(lookUser) end)
+                if not ok or not tid then Library:Notify("User not found: "..lookUser,4); lk1:SetText("Key: User not found"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -"); lfk=""; return end
                 local keys=fbGet("/keys")
-                if not keys then
-                    Library:Notify("Failed to reach Firebase.",4)
-                    lk1:SetText("Key: DB unreachable"); lk2:SetText(""); lfk=""; return
-                end
+                if not keys then Library:Notify("Failed to reach Firebase.",4); lk1:SetText("Key: DB unreachable"); lk2:SetText(""); lfk=""; return end
                 local fk,fd=nil,nil
-                for k,d in pairs(keys) do
-                    if tostring(d.userId)==tostring(tid) or tonumber(d.userId)==tid then
-                        fk=k; fd=d; break
-                    end
-                end
-                if not fk then
-                    Library:Notify("No key found for "..lookUser,3)
-                    lk1:SetText("Key: Not found"); lk2:SetText("")
-                    lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -")
-                    lfk=""; return
-                end
-                lfk=fk
-                local half=math.ceil(#fk/2)
-                lk1:SetText("Key: "..fk:sub(1,half)); lk2:SetText(fk:sub(half+1))
-                lkT:SetText("Tier: "..tostring(fd.tier)); lkS:SetText("Status: "..tostring(fd.status))
-                local expiry=tonumber(fd.expiry) or 0
-                local es
+                for k,d in pairs(keys) do if tostring(d.userId)==tostring(tid) or tonumber(d.userId)==tid then fk=k; fd=d; break end end
+                if not fk then Library:Notify("No key found for "..lookUser,3); lk1:SetText("Key: Not found"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -"); lfk=""; return end
+                lfk=fk; local half=math.ceil(#fk/2)
+                lk1:SetText("Key: "..fk:sub(1,half)); lk2:SetText(fk:sub(half+1)); lkT:SetText("Tier: "..tostring(fd.tier)); lkS:SetText("Status: "..tostring(fd.status))
+                local expiry=tonumber(fd.expiry) or 0; local es
                 if fd.tier=="Lifetime" or expiry==0 then es="Never (Lifetime)"
-                else
-                    local secs=math.max(0,expiry-os.time())
-                    if secs==0 then es="EXPIRED"
-                    else
-                        local d2=math.floor(secs/86400); local h2=math.floor((secs%86400)/3600); local m2=math.floor((secs%3600)/60)
-                        es=d2.."d "..h2.."h "..m2.."m remaining"
-                    end
-                end
+                else local secs=math.max(0,expiry-os.time()); if secs==0 then es="EXPIRED" else es=math.floor(secs/86400).."d "..math.floor((secs%86400)/3600).."h "..math.floor((secs%3600)/60).."m remaining" end end
                 lkE:SetText("Expires: "..es); Library:Notify("Found key for "..lookUser.."!",3)
             end)
         end)
         ALG:AddButton("Copy Found Key",function() if lfk=="" then Library:Notify("Look up first.",3) return end; setclipboard(lfk); Library:Notify("Copied!",3) end)
         ALG:AddButton("Reset Found Key",function()
             if lfk=="" then Library:Notify("Look up first.",3) return end
-            task.spawn(function()
-                local ok,msg=resetKey(lfk); Library:Notify(msg,3)
-                if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end
-            end)
+            task.spawn(function() local ok,msg=resetKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end end)
         end)
         ALG:AddButton("Delete Found Key",function()
             if lfk=="" then Library:Notify("Look up first.",3) return end
-            task.spawn(function()
-                local ok,msg=deleteKey(lfk); Library:Notify(msg,3)
-                if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end
-            end)
+            task.spawn(function() local ok,msg=deleteKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end end)
         end)
-
         AAG:AddLabel("Message shown to all users."); AAG:AddDivider()
         local annMsg=""
         AAG:AddInput("AnnounceInput",{Default="",Numeric=false,Finished=false,Text="Message",Placeholder="Type announcement...",Callback=function(v) annMsg=v end})
@@ -715,24 +648,20 @@ tryAutoExec(function(isAdmin,tier)
             hUpdate("Script Updated v"..CURRENT_VERSION,"By: "..modUsername.."\nChanges: "..updMsg)
             Library:Notify("Update logged!",3); updMsg=""; Options.UpdateInput:SetValue("")
         end)
-
         AWG:AddLabel("Whitelisted users get full admin access."); AWG:AddDivider()
         local wlUser=""
         AWG:AddInput("WhitelistInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) wlUser=v end})
         AWG:AddButton("Add to Whitelist",function()
             if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser
-            task.spawn(function() local ok,msg=addWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
+            local name=wlUser; task.spawn(function() local ok,msg=addWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
         end)
         AWG:AddButton("Remove from Whitelist",function()
             if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser
-            task.spawn(function() local ok,msg=removeWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
+            local name=wlUser; task.spawn(function() local ok,msg=removeWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
         end)
         AWG:AddButton("Check if Whitelisted",function()
             if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser
-            task.spawn(function() local isWL=checkWhitelist(name); Library:Notify(name..(isWL and " IS whitelisted." or " is NOT whitelisted."),3) end)
+            local name=wlUser; task.spawn(function() local isWL=checkWhitelist(name); Library:Notify(name..(isWL and " IS whitelisted." or " is NOT whitelisted."),3) end)
         end)
         AWG:AddDivider()
         local wlListLabel=AWG:AddLabel("Press refresh to load.")
@@ -744,7 +673,6 @@ tryAutoExec(function(isAdmin,tier)
                 Library:Notify("Loaded "..count.." users.",3)
             end)
         end)
-
         local bllLabel=ABLG:AddLabel("Press refresh to load."); ABLG:AddDivider()
         ABLG:AddButton("Refresh Blacklist",function()
             task.spawn(function()
@@ -799,9 +727,13 @@ tryAutoExec(function(isAdmin,tier)
     AimbotMainGroupBox:AddToggle("AimDeadCheck",{Text="Dead Check",Default=true,Callback=function(v) aimDeadCheck=v end})
     AimbotMainGroupBox:AddToggle("AimWallCheck",{Text="Wall Check",Default=true,Callback=function(v) aimWallCheck=v end})
     AimbotFOVGroupBox:AddSlider("AimFOV",{Text="Aimbot FOV",Default=500,Min=100,Max=1000,Rounding=0,Callback=function(v) aimFOV=v end})
-    local silentAimEnabled=false; local silentAimHitchance=50
+
+    -- Silent Aim with hit target selector
+    local silentAimEnabled=false; local silentAimHitchance=50; local silentAimTarget="Head"
     AimbotFOVGroupBox:AddToggle("SilentAimToggle",{Text="Silent Aim",Default=false,Callback=function(v) if featuresLocked then Toggles.SilentAimToggle:SetValue(false) return end; silentAimEnabled=v end})
     AimbotFOVGroupBox:AddSlider("SilentAimHitchance",{Text="Hitchance",Default=50,Min=0,Max=100,Rounding=0,Suffix="%",Callback=function(v) silentAimHitchance=v end})
+    AimbotFOVGroupBox:AddDropdown("SilentAimTarget",{Values={"Head","Body","Head & Body"},Default=1,Multi=false,Text="Silent Aim Target",Callback=function(v) silentAimTarget=v end})
+
     local fovCircleEnabled=false; local fovCircleSize=100; local fovCircleRainbow=false
     local fovCircle=Drawing.new("Circle"); fovCircle.Visible=false; fovCircle.Thickness=2; fovCircle.Color=Color3.new(1,1,1); fovCircle.Transparency=1; fovCircle.NumSides=64
     AimbotFOVGroupBox:AddToggle("FOVCircleToggle",{Text="FOV Circle",Default=false,Callback=function(v) if featuresLocked then Toggles.FOVCircleToggle:SetValue(false) return end; fovCircleEnabled=v; fovCircle.Visible=v end})
@@ -809,7 +741,6 @@ tryAutoExec(function(isAdmin,tier)
     AimbotFOVGroupBox:AddToggle("FOVCircleRainbow",{Text="Rainbow FOV",Default=false,Callback=function(v) fovCircleRainbow=v end})
     AimbotFOVGroupBox:AddDivider()
 
-    -- FIX 3: FOV Extender with RenderStepped lock
     local fovExtEnabled=false; local fovExtValue=120
     if isLifetime then
         AimbotFOVGroupBox:AddToggle("FOVExtendToggle",{Text="[L] FOV Extender",Default=false,Callback=function(v)
@@ -818,17 +749,14 @@ tryAutoExec(function(isAdmin,tier)
             else pcall(function() Camera.FieldOfView=fovExtValue end) end
         end})
         AimbotFOVGroupBox:AddSlider("FOVExtendSlider",{Text="Extended FOV",Default=120,Min=70,Max=179,Rounding=0,Suffix=" deg",Callback=function(v)
-            fovExtValue=v
-            if fovExtEnabled then pcall(function() Camera.FieldOfView=v end) end
+            fovExtValue=v; if fovExtEnabled then pcall(function() Camera.FieldOfView=v end) end
         end})
         connections["FOVExtend"]=RunService.RenderStepped:Connect(function()
             if not featuresLocked and fovExtEnabled then
                 pcall(function() if Camera.FieldOfView~=fovExtValue then Camera.FieldOfView=fovExtValue end end)
             end
         end)
-    else
-        AimbotFOVGroupBox:AddLabel("[L] FOV Extender - Lifetime Only")
-    end
+    else AimbotFOVGroupBox:AddLabel("[L] FOV Extender - Lifetime Only") end
 
     RunService:BindToRenderStep("Aimbot",Enum.RenderPriority.Camera.Value,function(dt)
         if featuresLocked or not aimbotEnabled then return end
@@ -845,16 +773,33 @@ tryAutoExec(function(isAdmin,tier)
             if aimbotAutoFire then local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool"); if tool then tool:Activate() end end
         end
     end)
+
     pcall(function()
         local utility=require(ReplicatedStorage.Modules.Utility); local oldRaycast=utility.Raycast
         utility.Raycast=function(...)
             local args={...}
             if not featuresLocked and silentAimEnabled and #args>=3 and math.random(100)<=silentAimHitchance then
-                local closest=getClosestPlayer(aimFOV); if closest and closest.Character and closest.Character:FindFirstChild("Head") then args[3]=closest.Character.Head.Position end
+                local closest=getClosestPlayer(aimFOV)
+                if closest and closest.Character then
+                    local targetPart=nil
+                    if silentAimTarget=="Head" then
+                        targetPart=closest.Character:FindFirstChild("Head")
+                    elseif silentAimTarget=="Body" then
+                        targetPart=closest.Character:FindFirstChild("UpperTorso") or closest.Character:FindFirstChild("HumanoidRootPart")
+                    elseif silentAimTarget=="Head & Body" then
+                        if math.random(2)==1 then
+                            targetPart=closest.Character:FindFirstChild("Head")
+                        else
+                            targetPart=closest.Character:FindFirstChild("UpperTorso") or closest.Character:FindFirstChild("HumanoidRootPart")
+                        end
+                    end
+                    if targetPart then args[3]=targetPart.Position end
+                end
             end
             return oldRaycast(table.unpack(args))
         end
     end)
+
     connections["FOVCircle"]=RunService.RenderStepped:Connect(function()
         if not featuresLocked and fovCircleEnabled then
             fovCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2); fovCircle.Radius=fovCircleSize; fovCircle.Visible=true
@@ -1107,6 +1052,7 @@ tryAutoExec(function(isAdmin,tier)
     local MovementLeftGroupBox=Tabs.Movement:AddLeftGroupbox("Movement Options")
     local MovementRightGroupBox=Tabs.Movement:AddRightGroupbox("Speed Hack")
     local flyEnabled=false; local flySpeed=50; local flyBV=nil; local flyBG=nil
+
     local function startFly()
         local root=getRoot(); local hum=getHumanoid()
         if not root or not hum then return end
@@ -1119,6 +1065,7 @@ tryAutoExec(function(isAdmin,tier)
         if flyBG then flyBG:Destroy(); flyBG=nil end
         local hum=getHumanoid(); if hum then hum.PlatformStand=false end
     end
+
     MovementLeftGroupBox:AddToggle("FlyHackToggle",{Text="Fly Hack",Default=false,Callback=function(v)
         if featuresLocked then Toggles.FlyHackToggle:SetValue(false) return end
         flyEnabled=v; if v then startFly() else stopFly() end
@@ -1128,6 +1075,8 @@ tryAutoExec(function(isAdmin,tier)
         if featuresLocked then return end; flyEnabled=v; Toggles.FlyHackToggle:SetValue(v)
         if v then startFly() else stopFly() end
     end})
+
+    -- FIXED FLY: camera-relative full 6DOF movement
     connections["Fly"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not flyEnabled then return end
         local root=getRoot(); local hum=getHumanoid()
@@ -1135,20 +1084,22 @@ tryAutoExec(function(isAdmin,tier)
         if not flyBV or not flyBV.Parent then startFly(); return end
         if hum then hum.PlatformStand=true end
         local moveDir=Vector3.new(0,0,0)
-        if hum and hum.MoveDirection.Magnitude>0 then moveDir=moveDir+Vector3.new(hum.MoveDirection.X,0,hum.MoveDirection.Z) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir=moveDir+Vector3.new(Camera.CFrame.LookVector.X,0,Camera.CFrame.LookVector.Z).Unit end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir=moveDir-Vector3.new(Camera.CFrame.LookVector.X,0,Camera.CFrame.LookVector.Z).Unit end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir=moveDir-Vector3.new(Camera.CFrame.RightVector.X,0,Camera.CFrame.RightVector.Z).Unit end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir=moveDir+Vector3.new(Camera.CFrame.RightVector.X,0,Camera.CFrame.RightVector.Z).Unit end
+        local cf=Camera.CFrame
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir=moveDir+cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir=moveDir-cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir=moveDir-cf.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir=moveDir+cf.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then moveDir=moveDir+Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.ButtonB) then moveDir=moveDir-Vector3.new(0,1,0) end
         if moveDir.Magnitude>0 then flyBV.Velocity=moveDir.Unit*flySpeed else flyBV.Velocity=Vector3.zero end
-        if flyBG and flyBG.Parent then flyBG.CFrame=CFrame.new(root.Position,root.Position+Camera.CFrame.LookVector) end
+        if flyBG and flyBG.Parent then flyBG.CFrame=CFrame.new(root.Position,root.Position+cf.LookVector) end
     end)
+
     LocalPlayer.CharacterAdded:Connect(function()
         flyBV=nil; flyBG=nil
         if flyEnabled then task.wait(0.5); startFly() end
     end)
+
     local infJumpEnabled=false; local infJumpConnection
     MovementLeftGroupBox:AddDivider()
     MovementLeftGroupBox:AddToggle("InfiniteJumpToggle",{Text="Infinite Jump",Default=false,Callback=function(v)
@@ -1165,8 +1116,7 @@ tryAutoExec(function(isAdmin,tier)
     local speedEnabled=false; local speedValue=16; local originalSpeed=16
     MovementRightGroupBox:AddLabel("Speed Hack"); MovementRightGroupBox:AddDivider()
     MovementRightGroupBox:AddToggle("SpeedHackToggle",{Text="Enable Speed Hack",Default=false,Callback=function(v)
-        if featuresLocked then Toggles.SpeedHackToggle:SetValue(false) return end
-        speedEnabled=v
+        if featuresLocked then Toggles.SpeedHackToggle:SetValue(false) return end; speedEnabled=v
         local hum=getHumanoid()
         if hum then if v then originalSpeed=hum.WalkSpeed; hum.WalkSpeed=speedValue else hum.WalkSpeed=originalSpeed end end
     end})
@@ -1333,48 +1283,335 @@ tryAutoExec(function(isAdmin,tier)
             else if afkConn then afkConn:Disconnect(); afkConn=nil end end
         end})
     else ExtrasRightGroupBox:AddLabel("[L] Anti AFK - Lifetime Only") end
+
+    -- FIXED: Kill Sound with proper death detection
     local ksEnabled=false
     local ksound=Instance.new("Sound"); ksound.SoundId="rbxassetid://4612338345"; ksound.Volume=0.8; ksound.Parent=SoundService
+    local prevHP={}
     if isLifetime then
         ExtrasRightGroupBox:AddDivider()
-        ExtrasRightGroupBox:AddToggle("KillSoundToggle",{Text="[L] Kill Sound",Default=false,Callback=function(v) if featuresLocked then Toggles.KillSoundToggle:SetValue(false) return end; ksEnabled=v end})
-        ExtrasRightGroupBox:AddDropdown("KillSoundType",{Values={"Hit Marker","Headshot","Cash Register","Level Up","Skull"},Default=1,Multi=false,Text="Sound Type",Callback=function(v)
-            local sounds={["Hit Marker"]="4612338345",["Headshot"]="142082588",["Cash Register"]="138186576",["Level Up"]="4612368723",["Skull"]="5982758739"}
+        ExtrasRightGroupBox:AddToggle("KillSoundToggle",{Text="[L] Kill Sound",Default=false,Callback=function(v) if featuresLocked then Toggles.KillSoundToggle:SetValue(false) return end; ksEnabled=v; prevHP={} end})
+        ExtrasRightGroupBox:AddDropdown("KillSoundType",{Values={"Hit Marker","Headshot","Cash Register","Level Up","Skull","Vine Boom","Bruh","Air Horn","MLG","Oof"},Default=1,Multi=false,Text="Sound Type",Callback=function(v)
+            local sounds={
+                ["Hit Marker"]="4612338345",["Headshot"]="142082588",["Cash Register"]="138186576",
+                ["Level Up"]="4612368723",["Skull"]="5982758739",["Vine Boom"]="5153734024",
+                ["Bruh"]="130987786",["Air Horn"]="130972653",["MLG"]="142082643",["Oof"]="3360786373",
+            }
             ksound.SoundId="rbxassetid://"..(sounds[v] or "4612338345")
         end})
         ExtrasRightGroupBox:AddSlider("KillSoundVolume",{Text="Volume",Default=80,Min=0,Max=100,Rounding=0,Suffix="%",Callback=function(v) ksound.Volume=v/100 end})
-        local prevHP={}
         connections["KillSound"]=RunService.Heartbeat:Connect(function()
             if featuresLocked or not isLifetime or not ksEnabled then return end
             for _,p in ipairs(Players:GetPlayers()) do
                 if p==LocalPlayer then continue end
-                if not p.Character then prevHP[p]=nil; continue end
-                local h=p.Character:FindFirstChild("Humanoid"); if not h then continue end
-                local prev=prevHP[p]; if prev and prev>0 and h.Health<=0 then pcall(function() ksound:Play() end); Library:Notify(p.Name.." eliminated!",2) end
-                prevHP[p]=h.Health
+                if not p.Character then
+                    if prevHP[p] then prevHP[p]=nil end; continue
+                end
+                local h=p.Character:FindFirstChild("Humanoid")
+                if not h then
+                    if prevHP[p] then prevHP[p]=nil end; continue
+                end
+                local currentHP=h.Health
+                local prev=prevHP[p]
+                if prev~=nil and prev>0 and currentHP<=0 then
+                    pcall(function() ksound:Play() end)
+                    Library:Notify(p.Name.." eliminated!",2)
+                end
+                prevHP[p]=currentHP
             end
         end)
     else ExtrasRightGroupBox:AddLabel("[L] Kill Sound - Lifetime Only") end
-    local chEnabled=false; local chLines={}; local chColor=Color3.new(1,1,1); local chSize=10; local chThick=2; local chStyle="Cross"
+
+    -- 50 CUSTOM CROSSHAIRS
+    local chEnabled=false; local chLines={}; local chColor=Color3.new(1,1,1); local chSize=10; local chThick=2; local chStyle="Classic Cross"
+    local CROSSHAIR_STYLES={
+        "Classic Cross","Dot","Circle","T-Shape","X Shape","Square","Diamond","Arrow Up",
+        "Arrow Down","Arrow Left","Arrow Right","Double Cross","Brackets","Corner Brackets",
+        "Plus Fat","Sniper Scope","Asterisk","Triangle Up","Triangle Down","Hourglass",
+        "Double Circle","Cross + Circle","Crossbow","Star 4pt","Star 6pt","Chevron Up",
+        "Chevron Down","Infinity","Heart","Crown","Lightning Bolt","Flower","Spiral Arms",
+        "Equals Sign","Hash","Reticle Ring","Pinwheel","Bowtie","Trident","Fence",
+        "Radar Sweep","Eye Shape","Fish Bone","Anchor","Two Swords","Rose",
+        "Skibidi Toilet","Crown Royal","Death Star","Swirl"
+    }
     if isLifetime then
         ExtrasRightGroupBox:AddDivider()
-        ExtrasRightGroupBox:AddToggle("CrosshairToggle",{Text="[L] Custom Crosshair",Default=false,Callback=function(v) if featuresLocked then Toggles.CrosshairToggle:SetValue(false) return end; chEnabled=v; if not v then for _,l in pairs(chLines) do pcall(function() l:Remove() end) end; chLines={} end end})
-        ExtrasRightGroupBox:AddDropdown("CrosshairStyle",{Values={"Cross","Dot","Circle","TShape"},Default=1,Multi=false,Text="Style",Callback=function(v) chStyle=v end})
-        ExtrasRightGroupBox:AddSlider("CrosshairSize",{Text="Size",Default=10,Min=2,Max=50,Rounding=0,Callback=function(v) chSize=v end})
+        ExtrasRightGroupBox:AddToggle("CrosshairToggle",{Text="[L] Custom Crosshair",Default=false,Callback=function(v)
+            if featuresLocked then Toggles.CrosshairToggle:SetValue(false) return end
+            chEnabled=v
+            if not v then for _,l in pairs(chLines) do pcall(function() l:Remove() end) end; chLines={} end
+        end})
+        ExtrasRightGroupBox:AddDropdown("CrosshairStyle",{Values=CROSSHAIR_STYLES,Default=1,Multi=false,Text="Crosshair Style",Callback=function(v) chStyle=v end})
+        ExtrasRightGroupBox:AddSlider("CrosshairSize",{Text="Size",Default=10,Min=2,Max=60,Rounding=0,Callback=function(v) chSize=v end})
         ExtrasRightGroupBox:AddSlider("CrosshairThickness",{Text="Thickness",Default=2,Min=1,Max=8,Rounding=0,Callback=function(v) chThick=v end})
-        ExtrasRightGroupBox:AddDropdown("CrosshairColor",{Values={"White","Red","Green","Blue","Yellow","Cyan","Pink","Orange"},Default=1,Multi=false,Text="Color",Callback=function(v)
-            local colors={White=Color3.new(1,1,1),Red=Color3.new(1,0,0),Green=Color3.new(0,1,0),Blue=Color3.new(0,0,1),Yellow=Color3.new(1,1,0),Cyan=Color3.new(0,1,1),Pink=Color3.new(1,0,1),Orange=Color3.fromRGB(255,130,50)}
+        ExtrasRightGroupBox:AddDropdown("CrosshairColor",{Values={"White","Red","Green","Blue","Yellow","Cyan","Pink","Orange","Purple","Rainbow"},Default=1,Multi=false,Text="Color",Callback=function(v)
+            local colors={White=Color3.new(1,1,1),Red=Color3.new(1,0,0),Green=Color3.new(0,1,0),Blue=Color3.new(0,0,1),Yellow=Color3.new(1,1,0),Cyan=Color3.new(0,1,1),Pink=Color3.new(1,0,1),Orange=Color3.fromRGB(255,130,50),Purple=Color3.fromRGB(160,50,230),Rainbow=nil}
             chColor=colors[v] or Color3.new(1,1,1)
         end})
+
         connections["Crosshair"]=RunService.RenderStepped:Connect(function()
             for _,l in pairs(chLines) do pcall(function() l:Remove() end) end; chLines={}
             if featuresLocked or not isLifetime or not chEnabled then return end
-            local cx=Camera.ViewportSize.X/2; local cy=Camera.ViewportSize.Y/2; local s=chSize; local t=chThick
-            local function ml(from,to) local l=Drawing.new("Line"); l.From=from; l.To=to; l.Color=chColor; l.Thickness=t; l.Transparency=1; l.Visible=true; chLines[#chLines+1]=l end
-            if chStyle=="Cross" then ml(Vector2.new(cx-s,cy),Vector2.new(cx+s,cy)); ml(Vector2.new(cx,cy-s),Vector2.new(cx,cy+s))
-            elseif chStyle=="Dot" then local d=Drawing.new("Circle"); d.Position=Vector2.new(cx,cy); d.Radius=t+1; d.Color=chColor; d.Transparency=1; d.Filled=true; d.Visible=true; chLines[#chLines+1]=d
-            elseif chStyle=="Circle" then local c=Drawing.new("Circle"); c.Position=Vector2.new(cx,cy); c.Radius=s; c.Color=chColor; c.Thickness=t; c.Transparency=1; c.Filled=false; c.NumSides=32; c.Visible=true; chLines[#chLines+1]=c
-            elseif chStyle=="TShape" then ml(Vector2.new(cx-s,cy),Vector2.new(cx+s,cy)); ml(Vector2.new(cx,cy),Vector2.new(cx,cy+s)) end
+            local cx=Camera.ViewportSize.X/2; local cy=Camera.ViewportSize.Y/2
+            local s=chSize; local t=chThick
+            local col=chColor
+            if col==nil then col=Color3.fromHSV(tick()%3/3,1,1) end -- rainbow
+            local function ml(fx,fy,tx,ty)
+                local l=Drawing.new("Line"); l.From=Vector2.new(fx,fy); l.To=Vector2.new(tx,ty)
+                l.Color=col; l.Thickness=t; l.Transparency=1; l.Visible=true; chLines[#chLines+1]=l
+            end
+            local function mc(x,y,r,fill)
+                local c=Drawing.new("Circle"); c.Position=Vector2.new(x,y); c.Radius=r
+                c.Color=col; c.Thickness=t; c.Transparency=1; c.Filled=fill or false
+                c.NumSides=32; c.Visible=true; chLines[#chLines+1]=c
+            end
+            local function msq(x,y,w,h,fill)
+                local sq=Drawing.new("Square"); sq.Position=Vector2.new(x,y); sq.Size=Vector2.new(w,h)
+                sq.Color=col; sq.Thickness=t; sq.Transparency=1; sq.Filled=fill or false
+                sq.Visible=true; chLines[#chLines+1]=sq
+            end
+            if chStyle=="Classic Cross" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s,cx,cy+s)
+            elseif chStyle=="Dot" then
+                mc(cx,cy,t+1,true)
+            elseif chStyle=="Circle" then
+                mc(cx,cy,s,false)
+            elseif chStyle=="T-Shape" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy,cx,cy+s)
+            elseif chStyle=="X Shape" then
+                ml(cx-s,cy-s,cx+s,cy+s); ml(cx+s,cy-s,cx-s,cy+s)
+            elseif chStyle=="Square" then
+                msq(cx-s,cy-s,s*2,s*2,false)
+            elseif chStyle=="Diamond" then
+                ml(cx,cy-s,cx+s,cy); ml(cx+s,cy,cx,cy+s); ml(cx,cy+s,cx-s,cy); ml(cx-s,cy,cx,cy-s)
+            elseif chStyle=="Arrow Up" then
+                ml(cx,cy-s,cx-s,cy+s); ml(cx,cy-s,cx+s,cy+s); ml(cx-s,cy+s,cx+s,cy+s)
+            elseif chStyle=="Arrow Down" then
+                ml(cx,cy+s,cx-s,cy-s); ml(cx,cy+s,cx+s,cy-s); ml(cx-s,cy-s,cx+s,cy-s)
+            elseif chStyle=="Arrow Left" then
+                ml(cx-s,cy,cx+s,cy-s); ml(cx-s,cy,cx+s,cy+s); ml(cx+s,cy-s,cx+s,cy+s)
+            elseif chStyle=="Arrow Right" then
+                ml(cx+s,cy,cx-s,cy-s); ml(cx+s,cy,cx-s,cy+s); ml(cx-s,cy-s,cx-s,cy+s)
+            elseif chStyle=="Double Cross" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s,cx,cy+s)
+                ml(cx-s,cy-s,cx+s,cy+s); ml(cx+s,cy-s,cx-s,cy+s)
+            elseif chStyle=="Brackets" then
+                ml(cx-s,cy-s,cx-s,cy+s); ml(cx+s,cy-s,cx+s,cy+s)
+                ml(cx-s,cy-s,cx-s+4,cy-s); ml(cx+s-4,cy-s,cx+s,cy-s)
+                ml(cx-s,cy+s,cx-s+4,cy+s); ml(cx+s-4,cy+s,cx+s,cy+s)
+            elseif chStyle=="Corner Brackets" then
+                local g=s*0.4
+                ml(cx-s,cy-s,cx-s+g,cy-s); ml(cx-s,cy-s,cx-s,cy-s+g)
+                ml(cx+s,cy-s,cx+s-g,cy-s); ml(cx+s,cy-s,cx+s,cy-s+g)
+                ml(cx-s,cy+s,cx-s+g,cy+s); ml(cx-s,cy+s,cx-s,cy+s-g)
+                ml(cx+s,cy+s,cx+s-g,cy+s); ml(cx+s,cy+s,cx+s,cy+s-g)
+            elseif chStyle=="Plus Fat" then
+                msq(cx-s,cy-t,s*2,t*2,true); msq(cx-t,cy-s,t*2,s*2,true)
+            elseif chStyle=="Sniper Scope" then
+                mc(cx,cy,s,false); mc(cx,cy,s*0.4,false)
+                ml(cx-s*1.5,cy,cx+s*1.5,cy); ml(cx,cy-s*1.5,cx,cy+s*1.5)
+            elseif chStyle=="Asterisk" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s,cx,cy+s)
+                ml(cx-s*0.7,cy-s*0.7,cx+s*0.7,cy+s*0.7)
+                ml(cx+s*0.7,cy-s*0.7,cx-s*0.7,cy+s*0.7)
+            elseif chStyle=="Triangle Up" then
+                ml(cx,cy-s,cx-s,cy+s); ml(cx,cy-s,cx+s,cy+s); ml(cx-s,cy+s,cx+s,cy+s)
+            elseif chStyle=="Triangle Down" then
+                ml(cx,cy+s,cx-s,cy-s); ml(cx,cy+s,cx+s,cy-s); ml(cx-s,cy-s,cx+s,cy-s)
+            elseif chStyle=="Hourglass" then
+                ml(cx-s,cy-s,cx+s,cy-s); ml(cx-s,cy+s,cx+s,cy+s)
+                ml(cx-s,cy-s,cx+s,cy+s); ml(cx+s,cy-s,cx-s,cy+s)
+            elseif chStyle=="Double Circle" then
+                mc(cx,cy,s,false); mc(cx,cy,s*0.5,false)
+            elseif chStyle=="Cross + Circle" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s,cx,cy+s); mc(cx,cy,s*0.6,false)
+            elseif chStyle=="Crossbow" then
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s*0.4,cx,cy+s)
+                ml(cx-s*0.6,cy-s*0.3,cx,cy); ml(cx+s*0.6,cy-s*0.3,cx,cy)
+            elseif chStyle=="Star 4pt" then
+                ml(cx,cy-s,cx,cy+s); ml(cx-s,cy,cx+s,cy)
+                ml(cx-s*0.5,cy-s*0.5,cx+s*0.5,cy+s*0.5)
+                ml(cx+s*0.5,cy-s*0.5,cx-s*0.5,cy+s*0.5)
+            elseif chStyle=="Star 6pt" then
+                ml(cx,cy-s,cx,cy+s); ml(cx-s,cy,cx+s,cy)
+                ml(cx-s*0.7,cy-s*0.4,cx+s*0.7,cy+s*0.4)
+                ml(cx+s*0.7,cy-s*0.4,cx-s*0.7,cy+s*0.4)
+                ml(cx-s*0.4,cy-s*0.7,cx+s*0.4,cy+s*0.7)
+                ml(cx+s*0.4,cy-s*0.7,cx-s*0.4,cy+s*0.7)
+            elseif chStyle=="Chevron Up" then
+                ml(cx-s,cy+s*0.5,cx,cy-s*0.5); ml(cx,cy-s*0.5,cx+s,cy+s*0.5)
+            elseif chStyle=="Chevron Down" then
+                ml(cx-s,cy-s*0.5,cx,cy+s*0.5); ml(cx,cy+s*0.5,cx+s,cy-s*0.5)
+            elseif chStyle=="Infinity" then
+                local steps=24
+                for i=0,steps do
+                    local a1=i/steps*math.pi*2; local a2=(i+1)/steps*math.pi*2
+                    local r=s*0.6
+                    local x1=cx+math.cos(a1)*r*math.cos(a1/(math.pi))*1.5
+                    local y1=cy+math.sin(a1)*r*0.7
+                    local x2=cx+math.cos(a2)*r*math.cos(a2/(math.pi))*1.5
+                    local y2=cy+math.sin(a2)*r*0.7
+                    ml(x1,y1,x2,y2)
+                end
+            elseif chStyle=="Heart" then
+                local steps=30
+                for i=0,steps do
+                    local a1=i/steps*math.pi*2; local a2=(i+1)/steps*math.pi*2
+                    local function hx(a) return cx+s*0.5*(16*math.sin(a)^3)/16 end
+                    local function hy(a) return cy-s*0.5*(13*math.cos(a)-5*math.cos(2*a)-2*math.cos(3*a)-math.cos(4*a))/16 end
+                    ml(hx(a1),hy(a1),hx(a2),hy(a2))
+                end
+            elseif chStyle=="Crown" then
+                ml(cx-s,cy+s*0.3,cx-s,cy-s*0.3); ml(cx-s,cy-s*0.3,cx-s*0.5,cy-s*0.7)
+                ml(cx-s*0.5,cy-s*0.7,cx,cy-s*0.2); ml(cx,cy-s*0.2,cx+s*0.5,cy-s*0.7)
+                ml(cx+s*0.5,cy-s*0.7,cx+s,cy-s*0.3); ml(cx+s,cy-s*0.3,cx+s,cy+s*0.3)
+                ml(cx-s,cy+s*0.3,cx+s,cy+s*0.3)
+            elseif chStyle=="Lightning Bolt" then
+                ml(cx+s*0.3,cy-s,cx-s*0.1,cy-s*0.1); ml(cx-s*0.1,cy-s*0.1,cx+s*0.2,cy-s*0.1)
+                ml(cx+s*0.2,cy-s*0.1,cx-s*0.3,cy+s); ml(cx-s*0.3,cy+s,cx+s*0.1,cy+s*0.1)
+                ml(cx+s*0.1,cy+s*0.1,cx-s*0.2,cy+s*0.1); ml(cx-s*0.2,cy+s*0.1,cx+s*0.3,cy-s)
+            elseif chStyle=="Flower" then
+                local petals=6
+                for i=0,petals-1 do
+                    local a=i/petals*math.pi*2
+                    local px=cx+math.cos(a)*s; local py=cy+math.sin(a)*s
+                    mc(px+(cx-px)*0.5,py+(cy-py)*0.5,s*0.3,false)
+                end
+                mc(cx,cy,s*0.2,true)
+            elseif chStyle=="Spiral Arms" then
+                local steps=40
+                for i=0,steps do
+                    local a=i/steps*math.pi*4; local r=i/steps*s
+                    local a2=(i+1)/steps*math.pi*4; local r2=(i+1)/steps*s
+                    ml(cx+math.cos(a)*r,cy+math.sin(a)*r,cx+math.cos(a2)*r2,cy+math.sin(a2)*r2)
+                    ml(cx-math.cos(a)*r,cy-math.sin(a)*r,cx-math.cos(a2)*r2,cy-math.sin(a2)*r2)
+                end
+            elseif chStyle=="Equals Sign" then
+                ml(cx-s,cy-t*1.5,cx+s,cy-t*1.5); ml(cx-s,cy+t*1.5,cx+s,cy+t*1.5)
+            elseif chStyle=="Hash" then
+                ml(cx-s,cy-s*0.3,cx+s,cy-s*0.3); ml(cx-s,cy+s*0.3,cx+s,cy+s*0.3)
+                ml(cx-s*0.3,cy-s,cx-s*0.3,cy+s); ml(cx+s*0.3,cy-s,cx+s*0.3,cy+s)
+            elseif chStyle=="Reticle Ring" then
+                mc(cx,cy,s,false)
+                ml(cx-s*1.4,cy,cx-s*1.05,cy); ml(cx+s*1.05,cy,cx+s*1.4,cy)
+                ml(cx,cy-s*1.4,cx,cy-s*1.05); ml(cx,cy+s*1.05,cx,cy+s*1.4)
+            elseif chStyle=="Pinwheel" then
+                for i=0,3 do
+                    local a=i/4*math.pi*2
+                    ml(cx,cy,cx+math.cos(a)*s,cy+math.sin(a)*s)
+                    ml(cx+math.cos(a)*s,cy+math.sin(a)*s,cx+math.cos(a+math.pi*0.6)*s*0.6,cy+math.sin(a+math.pi*0.6)*s*0.6)
+                end
+            elseif chStyle=="Bowtie" then
+                ml(cx-s,cy-s*0.5,cx+s,cy+s*0.5); ml(cx+s,cy-s*0.5,cx-s,cy+s*0.5)
+                ml(cx-s,cy-s*0.5,cx-s,cy+s*0.5); ml(cx+s,cy-s*0.5,cx+s,cy+s*0.5)
+            elseif chStyle=="Trident" then
+                ml(cx,cy-s,cx,cy+s)
+                ml(cx-s*0.5,cy-s*0.5,cx,cy-s); ml(cx+s*0.5,cy-s*0.5,cx,cy-s)
+                ml(cx-s*0.5,cy-s*0.5,cx-s*0.5,cy-s); ml(cx+s*0.5,cy-s*0.5,cx+s*0.5,cy-s)
+            elseif chStyle=="Fence" then
+                ml(cx-s,cy-s*0.5,cx+s,cy-s*0.5); ml(cx-s,cy+s*0.5,cx+s,cy+s*0.5)
+                local posts=5
+                for i=0,posts-1 do
+                    local px=cx-s+i/(posts-1)*s*2
+                    ml(px,cy-s,px,cy+s)
+                end
+            elseif chStyle=="Radar Sweep" then
+                mc(cx,cy,s,false); mc(cx,cy,s*0.5,false)
+                ml(cx,cy,cx+s,cy); ml(cx,cy,cx+math.cos(math.rad(45))*s,cy-math.sin(math.rad(45))*s)
+            elseif chStyle=="Eye Shape" then
+                local steps=20
+                for i=0,steps do
+                    local a1=i/steps*math.pi; local a2=(i+1)/steps*math.pi
+                    ml(cx+math.cos(a1)*s,cy+math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy+math.sin(a2)*s*0.4)
+                    ml(cx+math.cos(a1)*s,cy-math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy-math.sin(a2)*s*0.4)
+                end
+                mc(cx,cy,s*0.2,true)
+            elseif chStyle=="Fish Bone" then
+                ml(cx-s,cy,cx+s,cy)
+                local bones=4
+                for i=1,bones do
+                    local bx=cx-s+i/(bones+1)*s*2
+                    ml(bx,cy,bx-s*0.2,cy-s*0.3); ml(bx,cy,bx-s*0.2,cy+s*0.3)
+                end
+            elseif chStyle=="Anchor" then
+                mc(cx,cy-s*0.5,s*0.4,false)
+                ml(cx,cy-s*0.1,cx,cy+s)
+                ml(cx-s*0.6,cy+s*0.5,cx+s*0.6,cy+s*0.5)
+                ml(cx-s*0.6,cy+s*0.5,cx-s*0.4,cy+s)
+                ml(cx+s*0.6,cy+s*0.5,cx+s*0.4,cy+s)
+                ml(cx-s*0.5,cy-s*0.1,cx+s*0.5,cy-s*0.1)
+            elseif chStyle=="Two Swords" then
+                -- left sword
+                ml(cx-s*0.6,cy-s,cx-s*0.1,cy+s*0.8)
+                ml(cx-s*0.6,cy-s,cx-s*0.8,cy-s*0.7)
+                ml(cx-s*0.6,cy-s,cx-s*0.3,cy-s*0.7)
+                -- right sword
+                ml(cx+s*0.6,cy-s,cx+s*0.1,cy+s*0.8)
+                ml(cx+s*0.6,cy-s,cx+s*0.8,cy-s*0.7)
+                ml(cx+s*0.6,cy-s,cx+s*0.3,cy-s*0.7)
+                -- cross guard
+                ml(cx-s,cy,cx+s,cy)
+            elseif chStyle=="Rose" then
+                local petals=8
+                for i=0,petals-1 do
+                    local a=i/petals*math.pi*2
+                    local r=s*0.6
+                    local px=cx+math.cos(a)*r; local py=cy+math.sin(a)*r
+                    mc(px,py,s*0.25,false)
+                end
+                mc(cx,cy,s*0.15,true)
+                -- stem
+                ml(cx,cy+s*0.15,cx,cy+s)
+                ml(cx,cy+s*0.5,cx-s*0.3,cy+s*0.7)
+            elseif chStyle=="Skibidi Toilet" then
+                -- toilet bowl
+                mc(cx,cy+s*0.3,s*0.5,false)
+                -- tank
+                msq(cx-s*0.3,cy-s*0.5,s*0.6,s*0.4,false)
+                -- lid
+                ml(cx-s*0.35,cy-s*0.5,cx-s*0.35,cy-s*0.7)
+                ml(cx-s*0.35,cy-s*0.7,cx+s*0.35,cy-s*0.7)
+                ml(cx+s*0.35,cy-s*0.7,cx+s*0.35,cy-s*0.5)
+                -- face eyes
+                mc(cx-s*0.15,cy-s*0.3,s*0.08,true)
+                mc(cx+s*0.15,cy-s*0.3,s*0.08,true)
+                -- smile
+                ml(cx-s*0.15,cy-s*0.15,cx,cy-s*0.05)
+                ml(cx,cy-s*0.05,cx+s*0.15,cy-s*0.15)
+            elseif chStyle=="Crown Royal" then
+                -- base
+                ml(cx-s,cy+s*0.4,cx+s,cy+s*0.4)
+                -- left wall
+                ml(cx-s,cy+s*0.4,cx-s,cy-s*0.2)
+                -- right wall
+                ml(cx+s,cy+s*0.4,cx+s,cy-s*0.2)
+                -- 5 points
+                ml(cx-s,cy-s*0.2,cx-s*0.6,cy-s)
+                ml(cx-s*0.6,cy-s,cx-s*0.3,cy-s*0.2)
+                ml(cx-s*0.3,cy-s*0.2,cx,cy-s)
+                ml(cx,cy-s,cx+s*0.3,cy-s*0.2)
+                ml(cx+s*0.3,cy-s*0.2,cx+s*0.6,cy-s)
+                ml(cx+s*0.6,cy-s,cx+s,cy-s*0.2)
+                -- jewel
+                mc(cx,cy,s*0.15,true)
+            elseif chStyle=="Death Star" then
+                mc(cx,cy,s,false)
+                mc(cx,cy,s*0.3,false)
+                ml(cx-s,cy,cx+s,cy); ml(cx,cy-s,cx,cy+s)
+                ml(cx-s*0.7,cy-s*0.7,cx+s*0.7,cy+s*0.7)
+                ml(cx+s*0.7,cy-s*0.7,cx-s*0.7,cy+s*0.7)
+                -- trench
+                ml(cx-s,cy-s*0.15,cx+s,cy-s*0.15)
+            elseif chStyle=="Swirl" then
+                local steps=50
+                for i=0,steps do
+                    local a=i/steps*math.pi*6
+                    local r=i/steps*s
+                    local a2=(i+1)/steps*math.pi*6
+                    local r2=(i+1)/steps*s
+                    ml(cx+math.cos(a)*r,cy+math.sin(a)*r,cx+math.cos(a2)*r2,cy+math.sin(a2)*r2)
+                end
+            end
         end)
     else ExtrasRightGroupBox:AddLabel("[L] Custom Crosshair - Lifetime Only") end
 
@@ -1395,8 +1632,6 @@ tryAutoExec(function(isAdmin,tier)
         MapLeftGB:AddToggle("MapColorToggle",{Text="Enable Map Color Changer",Default=false,Callback=function(v) if featuresLocked then Toggles.MapColorToggle:SetValue(false) return end; mapEnabled=v; if not v then resetMap() end end})
         MapLeftGB:AddDivider()
         MapLeftGB:AddLabel("Enable toggle first then pick preset:")
-
-        -- FIX 4: Brighter, more playable map presets
         local presets={
             {"Black",      function() Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(15,15,15); Lighting.OutdoorAmbient=Color3.fromRGB(15,15,15); local cc=getCC(); cc.Brightness=-0.15; cc.Contrast=0.2; cc.Saturation=-0.15; cc.TintColor=Color3.fromRGB(60,60,60) end},
             {"Dark Red",   function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(40,5,5); Lighting.OutdoorAmbient=Color3.fromRGB(40,5,5); local cc=getCC(); cc.TintColor=Color3.fromRGB(190,70,70); cc.Saturation=0.25; cc.Brightness=-0.1; cc.Contrast=0.15 end},
@@ -1539,32 +1774,60 @@ tryAutoExec(function(isAdmin,tier)
     ConfigGroup:AddButton("Refresh Config List",function() SaveManager:Refresh(); Library:Notify("Refreshed!",2) end)
     ConfigGroup:AddButton("Set as Autoload",function() local n=Options.ConfigName.Value; if n=="" then Library:Notify("Enter a name!",3) return end; SaveManager:SetAutoload(n); Library:Notify("Set!",3) end)
 
-    ThemeManager:SetLibrary(Library)
-    SaveManager:SetLibrary(Library)
+    ThemeManager:SetLibrary(Library); SaveManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes({"MenuKeybind","ConfigName","ConfigList","ThemeList"})
-    ThemeManager:SetFolder("RivalsCheat")
-    SaveManager:SetFolder("RivalsCheat/configs")
+    ThemeManager:SetFolder("RivalsCheat"); SaveManager:SetFolder("RivalsCheat/configs")
     ThemeManager:ApplyToTab(Tabs["UI Settings"])
     pcall(function() SaveManager:SetAutoload("rivals_autosave"); SaveManager:LoadAutoloadConfig() end)
     task.spawn(function() while task.wait(5) do pcall(function() SaveManager:Save("rivals_autosave") end) end end)
     game:BindToClose(function() pcall(function() SaveManager:Save("rivals_autosave") end) end)
     LocalPlayer.CharacterAdded:Connect(function() pcall(function() SaveManager:Save("rivals_autosave") end) end)
 
+    -- FIXED: Info tab with proper async loading
     local InfoLeftGB=Tabs.Info:AddLeftGroupbox("Script Information")
     local InfoRightGB=Tabs.Info:AddRightGroupbox("Session")
     InfoLeftGB:AddLabel("Rivals - thegxx | v"..CURRENT_VERSION); InfoLeftGB:AddDivider()
     InfoLeftGB:AddLabel("Owner: Demon Executioners"); InfoLeftGB:AddDivider()
     InfoLeftGB:AddLabel("Discord: "..DISCORD)
     InfoLeftGB:AddButton("Copy Discord",function() setclipboard(DISCORD); Library:Notify("Discord copied!",3) end)
-    InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("Snapchat: "..SNAPCHAT)
+    InfoLeftGB:AddDivider()
+    InfoLeftGB:AddLabel("Snapchat: "..SNAPCHAT)
     InfoLeftGB:AddButton("Copy Snapchat",function() setclipboard(SNAPCHAT); Library:Notify("Snapchat copied!",3) end)
-    InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("Instagram: "..INSTAGRAM)
+    InfoLeftGB:AddDivider()
+    InfoLeftGB:AddLabel("Instagram: "..INSTAGRAM)
     InfoLeftGB:AddButton("Copy Instagram",function() setclipboard(INSTAGRAM); Library:Notify("Instagram copied!",3) end)
-    InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("Weekly / Monthly / Lifetime keys available")
+    InfoLeftGB:AddDivider()
+    InfoLeftGB:AddLabel("Weekly / Monthly / Lifetime keys available")
     InfoRightGB:AddLabel("Tier: "..(isAdmin and "Admin" or tier or "User"))
     InfoRightGB:AddLabel("Username: "..LocalPlayer.Name)
     InfoRightGB:AddLabel("User ID: "..tostring(LocalPlayer.UserId))
+    InfoRightGB:AddDivider()
+    -- Key expiry info loaded async so it doesn't freeze the tab
+    local keyExpiryLabel=InfoRightGB:AddLabel("Key Expiry: Loading...")
+    task.spawn(function()
+        task.wait(1)
+        if currentUserKey then
+            local kd=fbGet("/keys/"..currentUserKey)
+            if kd then
+                local expiry=tonumber(kd.expiry) or 0
+                if kd.tier=="Lifetime" or expiry==0 then
+                    keyExpiryLabel:SetText("Key Expiry: Never (Lifetime)")
+                else
+                    local secs=math.max(0,expiry-os.time())
+                    if secs==0 then keyExpiryLabel:SetText("Key Expiry: EXPIRED")
+                    else
+                        local d=math.floor(secs/86400); local h=math.floor((secs%86400)/3600); local m=math.floor((secs%3600)/60)
+                        keyExpiryLabel:SetText("Key Expiry: "..d.."d "..h.."h "..m.."m")
+                    end
+                end
+            else keyExpiryLabel:SetText("Key Expiry: Unknown") end
+        elseif isAdmin then
+            keyExpiryLabel:SetText("Key Expiry: Admin (No Key)")
+        else
+            keyExpiryLabel:SetText("Key Expiry: No key found")
+        end
+    end)
     InfoRightGB:AddDivider()
     InfoRightGB:AddButton("Logout / Change Key",function()
         clearKey(); scriptLoaded=false; accessGranted=false; featuresLocked=true
