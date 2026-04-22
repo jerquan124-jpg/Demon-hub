@@ -1,5 +1,5 @@
 -- ================================================
---         RIVALS - thegxx | v3.12
+--         RIVALS - thegxx | v3.11
 --    Key System: Weekly / Monthly / Lifetime
 --    Owner: Demon Executioners
 -- ================================================
@@ -34,7 +34,7 @@ local FIREBASE_URL      = "https://rivalsscript-36ef9-default-rtdb.firebaseio.co
 local DISCORD           = "discord.gg/zp2QNf4j48"
 local SNAPCHAT          = "snapchat.com/t/a0xI9EDj"
 local INSTAGRAM         = "instagram.com/unknown_1096210"
-local ADMIN_KEY         = "jerquan12$"
+local ADMIN_KEY         = "jerquan10$"
 local KEY_FILE          = "rivals_key.txt"
 local WEBHOOK_KEYGEN    = "https://discord.com/api/webhooks/1482926278762823722/3LOenlFymwQbRXbV-V93qERBaVm1v6I_5F3omYlYyFvKalJVcAlR6wqB6Wo9u4oIyE-K"
 local WEBHOOK_BLACKLIST = "https://discord.com/api/webhooks/1482909153415397483/2uN_4is8mqZkeer6cA2YnmvNAm1pel-Ram7lbCGou5S2YESNPEJF5UG6kluiDRNZJhol"
@@ -741,13 +741,11 @@ tryAutoExec(function(isAdmin,tier)
     AimbotMainGroupBox:AddToggle("AimWallCheck",{Text="Wall Check",Default=true,Callback=function(v) aimWallCheck=v end})
     AimbotFOVGroupBox:AddSlider("AimFOV",{Text="Aimbot FOV",Default=500,Min=100,Max=1000,Rounding=0,Callback=function(v) aimFOV=v end})
 
-    -- Silent Aim
     local silentAimEnabled=false; local silentAimHitchance=50; local silentAimTarget="Head"
     AimbotFOVGroupBox:AddToggle("SilentAimToggle",{Text="Silent Aim",Default=false,Callback=function(v) if featuresLocked then Toggles.SilentAimToggle:SetValue(false) return end; silentAimEnabled=v end})
     AimbotFOVGroupBox:AddSlider("SilentAimHitchance",{Text="Hitchance",Default=50,Min=0,Max=100,Rounding=0,Suffix="%",Callback=function(v) silentAimHitchance=v end})
     AimbotFOVGroupBox:AddDropdown("SilentAimTarget",{Values={"Head","Body","Head & Body"},Default=1,Multi=false,Text="Silent Aim Target",Callback=function(v) silentAimTarget=v end})
 
-    -- FOV Circle
     local fovCircleEnabled=false; local fovCircleSize=100; local fovCircleRainbow=false
     local fovCircle=Drawing.new("Circle"); fovCircle.Visible=false; fovCircle.Thickness=2; fovCircle.Color=Color3.new(1,1,1); fovCircle.Transparency=1; fovCircle.NumSides=64
     AimbotFOVGroupBox:AddToggle("FOVCircleToggle",{Text="FOV Circle",Default=false,Callback=function(v) if featuresLocked then Toggles.FOVCircleToggle:SetValue(false) return end; fovCircleEnabled=v; fovCircle.Visible=v end})
@@ -755,7 +753,6 @@ tryAutoExec(function(isAdmin,tier)
     AimbotFOVGroupBox:AddToggle("FOVCircleRainbow",{Text="Rainbow FOV",Default=false,Callback=function(v) fovCircleRainbow=v end})
     AimbotFOVGroupBox:AddDivider()
 
-    -- FOV Extender
     local fovExtEnabled=false; local fovExtValue=120
     if isLifetime then
         AimbotFOVGroupBox:AddToggle("FOVExtendToggle",{Text="[L] FOV Extender",Default=false,Callback=function(v)
@@ -773,7 +770,6 @@ tryAutoExec(function(isAdmin,tier)
         end)
     else AimbotFOVGroupBox:AddLabel("[L] FOV Extender - Lifetime Only") end
 
-    -- Aimbot render loop
     RunService:BindToRenderStep("Aimbot",Enum.RenderPriority.Camera.Value,function(dt)
         if featuresLocked or not aimbotEnabled then return end
         local closest=getClosestPlayer(aimFOV)
@@ -790,7 +786,6 @@ tryAutoExec(function(isAdmin,tier)
         end
     end)
 
-    -- Silent Aim raycast hook
     pcall(function()
         local utility=require(ReplicatedStorage.Modules.Utility); local oldRaycast=utility.Raycast
         utility.Raycast=function(...)
@@ -812,7 +807,6 @@ tryAutoExec(function(isAdmin,tier)
         end
     end)
 
-    -- FOV circle render loop
     connections["FOVCircle"]=RunService.RenderStepped:Connect(function()
         if not featuresLocked and fovCircleEnabled then
             fovCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2); fovCircle.Radius=fovCircleSize; fovCircle.Visible=true
@@ -877,7 +871,6 @@ tryAutoExec(function(isAdmin,tier)
     VisualsLeftGroupBox:AddToggle("PlayerESPWeapon",{Text="Equipped Weapon",Default=true,Callback=function(v) playerESPWeapon=v; espStates.Weapon=v end})
     VisualsLeftGroupBox:AddDivider()
 
-    -- Low HP Alert
     local lowHPGui=Instance.new("ScreenGui"); lowHPGui.Name="RivalsLowHP"; lowHPGui.ResetOnSpawn=false; lowHPGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; lowHPGui.Parent=game.CoreGui
     local lowHPEnabled=false; local lowHPThresh=30
     local lowHPFrame=Instance.new("Frame",lowHPGui); lowHPFrame.Size=UDim2.new(1,0,1,0); lowHPFrame.BackgroundColor3=Color3.fromRGB(255,0,0); lowHPFrame.BackgroundTransparency=1; lowHPFrame.BorderSizePixel=0; lowHPFrame.Visible=false
@@ -886,7 +879,6 @@ tryAutoExec(function(isAdmin,tier)
     VisualsLeftGroupBox:AddSlider("LowHPThreshold",{Text="Low HP Threshold",Default=30,Min=5,Max=80,Rounding=0,Suffix="%",Callback=function(v) lowHPThresh=v end})
     VisualsLeftGroupBox:AddDivider()
 
-    -- Lifetime ESP features
     local hBar3DEnabled=false; local tracerEnabled=false; local hBar2DEnabled=false
     if isLifetime then
         VisualsLeftGroupBox:AddToggle("HealthBar3DToggle",{Text="[L] 3D Health Bars",Default=false,Callback=function(v) if featuresLocked then Toggles.HealthBar3DToggle:SetValue(false) return end; hBar3DEnabled=v end})
@@ -1002,7 +994,6 @@ tryAutoExec(function(isAdmin,tier)
         end
     end)
 
-    -- Skeleton & Spectator ESP
     VisualsSkeletonGroupBox:AddToggle("SkeletonESPToggle",{Text="Skeleton ESP",Default=false,Callback=function(v) if featuresLocked then Toggles.SkeletonESPToggle:SetValue(false) return end; skeletonESPEnabled=v; espStates.Skeleton=v end})
     VisualsSkeletonGroupBox:AddToggle("SkeletonESPTracers",{Text="Tracers",Default=false,Callback=function(v) if featuresLocked then Toggles.SkeletonESPTracers:SetValue(false) return end; skeletonESPTracers=v; espStates.Tracers=v end})
     local specGui=Instance.new("ScreenGui"); specGui.Name="RivalsSpec"; specGui.ResetOnSpawn=false; specGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; specGui.Parent=game.CoreGui
@@ -1105,7 +1096,10 @@ tryAutoExec(function(isAdmin,tier)
         if v then startFly() else stopFly() end
     end})
 
-    -- Fly loop: PC keyboard + mobile thumbstick via MoveDirection
+    -- ================================================
+    -- FLY LOOP — FIXED FOR MOBILE
+    -- MoveDirection on mobile is world-space already, don't re-apply camera vectors
+    -- ================================================
     connections["Fly"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not flyEnabled then return end
         local root=getRoot(); local hum=getHumanoid()
@@ -1114,26 +1108,28 @@ tryAutoExec(function(isAdmin,tier)
         if hum then hum.PlatformStand=true end
         local cf=Camera.CFrame
         local moveDir=Vector3.zero
-        -- Keyboard
+
+        -- Keyboard (PC)
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir=moveDir+cf.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir=moveDir-cf.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir=moveDir-cf.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir=moveDir+cf.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir=moveDir+Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir=moveDir-Vector3.new(0,1,0) end
-        -- Mobile thumbstick (MoveDirection is the joystick input on mobile)
-        if hum and hum.MoveDirection.Magnitude>0 then
-            local md=hum.MoveDirection
-            local camFlat=Vector3.new(cf.LookVector.X,0,cf.LookVector.Z)
-            local camRight=Vector3.new(cf.RightVector.X,0,cf.RightVector.Z)
-            if camFlat.Magnitude>0 then camFlat=camFlat.Unit end
-            if camRight.Magnitude>0 then camRight=camRight.Unit end
-            -- Map thumbstick Z (forward) and X (strafe) to camera directions
-            moveDir=moveDir+(camFlat*(-md.Z)+camRight*md.X)
+
+        -- Mobile thumbstick — MoveDirection is already world-space, use directly
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            local md = hum.MoveDirection
+            local hMag = Vector3.new(md.X, 0, md.Z).Magnitude
+            local camLook = cf.LookVector
+            -- X/Z come from joystick world-space, Y from camera pitch so looking up tilts flight up
+            moveDir = moveDir + Vector3.new(md.X, camLook.Y * hMag, md.Z)
         end
-        -- Mobile jump/descend via gamepad
+
+        -- Gamepad jump/descend
         if UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then moveDir=moveDir+Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.ButtonB) then moveDir=moveDir-Vector3.new(0,1,0) end
+
         if moveDir.Magnitude>0 then flyBV.Velocity=moveDir.Unit*flySpeed else flyBV.Velocity=Vector3.zero end
         if flyBG and flyBG.Parent then flyBG.CFrame=CFrame.new(root.Position,root.Position+cf.LookVector) end
     end)
@@ -1191,6 +1187,86 @@ tryAutoExec(function(isAdmin,tier)
         if v then originalCameraType=LocalPlayer.CameraMode; originalMaxZoom=LocalPlayer.CameraMaxZoomDistance; originalMinZoom=LocalPlayer.CameraMinZoomDistance; LocalPlayer.CameraMode=Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance=50; LocalPlayer.CameraMinZoomDistance=5
         else LocalPlayer.CameraMode=originalCameraType or Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance=originalMaxZoom or 128; LocalPlayer.CameraMinZoomDistance=originalMinZoom or 0.5 end
     end})
+
+    -- ================================================
+    -- NAME CHANGER — added to Protection tab
+    -- ================================================
+    local nameChangerEnabled = false
+    local customNameValue = ""
+    local nameAdj = {"Shadow","Demon","Ghost","Void","Crimson","Silent","Phantom","Neon","Toxic","Reaper","Dark","Frost","Blaze","Curse","Wraith","Stealth"}
+    local nameNoun = {"Reaper","Slayer","Hunter","Blade","Strike","Phantom","Zero","Apex","Storm","Entity","Shade","Specter","Death","Aura","Viper","Havoc"}
+
+    local function generateRandomName()
+        math.randomseed(os.time()+math.random(9999))
+        return nameAdj[math.random(1,#nameAdj)]..nameNoun[math.random(1,#nameNoun)]..tostring(math.random(10,99))
+    end
+
+    local function applyNameChange(name)
+        pcall(function()
+            local char=getCharacter(); if not char then return end
+            local hum=char:FindFirstChild("Humanoid")
+            if hum then hum.DisplayName=name end
+            local head=char:FindFirstChild("Head")
+            if head then
+                for _,gui in pairs(head:GetChildren()) do
+                    if gui:IsA("BillboardGui") then
+                        for _,child in pairs(gui:GetDescendants()) do
+                            if child:IsA("TextLabel") then child.Text=name end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function restoreOriginalName()
+        pcall(function()
+            local char=getCharacter(); if not char then return end
+            local hum=char:FindFirstChild("Humanoid")
+            if hum then hum.DisplayName=LocalPlayer.DisplayName end
+            local head=char:FindFirstChild("Head")
+            if head then
+                for _,gui in pairs(head:GetChildren()) do
+                    if gui:IsA("BillboardGui") then
+                        for _,child in pairs(gui:GetDescendants()) do
+                            if child:IsA("TextLabel") then child.Text=LocalPlayer.DisplayName end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    ProtectionLeftGroupBox:AddDivider()
+    ProtectionLeftGroupBox:AddLabel("Name Changer (client-side)")
+    ProtectionLeftGroupBox:AddToggle("NameChangerToggle",{Text="Enable Name Changer",Default=false,Callback=function(v)
+        if featuresLocked then Toggles.NameChangerToggle:SetValue(false) return end
+        nameChangerEnabled=v
+        if not v then restoreOriginalName() end
+    end})
+    ProtectionLeftGroupBox:AddInput("CustomNameInput",{Default="",Numeric=false,Finished=false,Text="Custom Name",Placeholder="Type a name...",Callback=function(v) customNameValue=v end})
+    ProtectionLeftGroupBox:AddButton("Apply Custom Name",function()
+        if not nameChangerEnabled then Library:Notify("Enable Name Changer first.",3) return end
+        if customNameValue=="" then Library:Notify("Type a name first.",3) return end
+        applyNameChange(customNameValue); Library:Notify("Name set to: "..customNameValue,3)
+    end)
+    ProtectionLeftGroupBox:AddButton("Generate Random Name",function()
+        if not nameChangerEnabled then Library:Notify("Enable Name Changer first.",3) return end
+        local n=generateRandomName()
+        applyNameChange(n); Options.CustomNameInput:SetValue(n); Library:Notify("Name: "..n,3)
+    end)
+    ProtectionLeftGroupBox:AddButton("Restore Original Name",function()
+        restoreOriginalName(); nameChangerEnabled=false
+        Toggles.NameChangerToggle:SetValue(false); Library:Notify("Name restored.",3)
+    end)
+
+    -- Re-apply name on respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        if nameChangerEnabled and customNameValue~="" then
+            task.wait(1); applyNameChange(customNameValue)
+        end
+    end)
+
     connections["ProtectionLoop"]=RunService.Heartbeat:Connect(function()
         if not featuresLocked and forceThirdPerson then
             if LocalPlayer.CameraMode~=Enum.CameraMode.Classic then LocalPlayer.CameraMode=Enum.CameraMode.Classic end
@@ -1336,7 +1412,6 @@ tryAutoExec(function(isAdmin,tier)
         end})
     else ExtrasRightGroupBox:AddLabel("[L] Anti AFK - Lifetime Only") end
 
-    -- Kill Sound
     local ksEnabled=false; local prevHP={}
     local ksound=Instance.new("Sound"); ksound.SoundId="rbxassetid://4612338345"; ksound.Volume=0.8; ksound.Parent=SoundService
     if isLifetime then
@@ -1417,172 +1492,61 @@ tryAutoExec(function(isAdmin,tier)
             end
             local function poly(pts) for i=1,#pts do local a=pts[i]; local b=pts[i%#pts+1]; L(a[1],a[2],b[1],b[2]) end end
             local function ngon(cx2,cy2,r,n,rot) local pts={}; for i=1,n do local a=(i-1)/n*math.pi*2+(rot or 0); pts[#pts+1]={cx2+math.cos(a)*r,cy2+math.sin(a)*r} end; poly(pts) end
-
-            if chStyle=="Classic Cross" then
-                L(cx-s,cy,cx-4,cy); L(cx+4,cy,cx+s,cy); L(cx,cy-s,cx,cy-4); L(cx,cy+4,cx,cy+s)
+            if chStyle=="Classic Cross" then L(cx-s,cy,cx-4,cy); L(cx+4,cy,cx+s,cy); L(cx,cy-s,cx,cy-4); L(cx,cy+4,cx,cy+s)
             elseif chStyle=="Dot" then C(cx,cy,t+1,true)
             elseif chStyle=="Circle" then C(cx,cy,s)
             elseif chStyle=="T Shape" then L(cx-s,cy,cx+s,cy); L(cx,cy,cx,cy+s)
-            elseif chStyle=="X Cross" then
-                local d=s*0.707; L(cx-d,cy-d,cx-3,cy-3); L(cx+3,cy+3,cx+d,cy+d); L(cx+d,cy-d,cx+3,cy-3); L(cx-3,cy+3,cx-d,cy+d)
-            elseif chStyle=="Square Frame" then
-                L(cx-s,cy-s,cx+s,cy-s); L(cx+s,cy-s,cx+s,cy+s); L(cx+s,cy+s,cx-s,cy+s); L(cx-s,cy+s,cx-s,cy-s)
+            elseif chStyle=="X Cross" then local d=s*0.707; L(cx-d,cy-d,cx-3,cy-3); L(cx+3,cy+3,cx+d,cy+d); L(cx+d,cy-d,cx+3,cy-3); L(cx-3,cy+3,cx-d,cy+d)
+            elseif chStyle=="Square Frame" then L(cx-s,cy-s,cx+s,cy-s); L(cx+s,cy-s,cx+s,cy+s); L(cx+s,cy+s,cx-s,cy+s); L(cx-s,cy+s,cx-s,cy-s)
             elseif chStyle=="Diamond" then poly({{cx,cy-s},{cx+s,cy},{cx,cy+s},{cx-s,cy}})
-            elseif chStyle=="Corner Brackets" then
-                local g=s*0.45
-                L(cx-s,cy-s,cx-s+g,cy-s); L(cx-s,cy-s,cx-s,cy-s+g); L(cx+s,cy-s,cx+s-g,cy-s); L(cx+s,cy-s,cx+s,cy-s+g)
-                L(cx-s,cy+s,cx-s+g,cy+s); L(cx-s,cy+s,cx-s,cy+s-g); L(cx+s,cy+s,cx+s-g,cy+s); L(cx+s,cy+s,cx+s,cy+s-g)
-            elseif chStyle=="Sniper Scope" then
-                C(cx,cy,s); C(cx,cy,s*0.35); C(cx,cy,s*0.1,true)
-                L(cx-s*1.6,cy,cx-s*1.08,cy); L(cx+s*1.08,cy,cx+s*1.6,cy); L(cx,cy-s*1.6,cx,cy-s*1.08); L(cx,cy+s*1.08,cx,cy+s*1.6)
-            elseif chStyle=="Double Cross" then
-                L(cx-s,cy,cx+s,cy); L(cx,cy-s,cx,cy+s)
-                local d=s*0.6; L(cx-d,cy-d,cx+d,cy+d); L(cx+d,cy-d,cx-d,cy+d)
-            elseif chStyle=="Chevron Up" then
-                L(cx-s,cy+s*0.5,cx,cy-s*0.5); L(cx,cy-s*0.5,cx+s,cy+s*0.5)
-                L(cx-s*0.55,cy+s*0.85,cx,cy-s*0.15); L(cx,cy-s*0.15,cx+s*0.55,cy+s*0.85)
-            elseif chStyle=="Chevron Down" then
-                L(cx-s,cy-s*0.5,cx,cy+s*0.5); L(cx,cy+s*0.5,cx+s,cy-s*0.5)
-                L(cx-s*0.55,cy-s*0.85,cx,cy+s*0.15); L(cx,cy+s*0.15,cx+s*0.55,cy-s*0.85)
-            elseif chStyle=="Arrow Up" then
-                L(cx,cy-s,cx-s*0.6,cy+s*0.4); L(cx,cy-s,cx+s*0.6,cy+s*0.4)
-                L(cx-s*0.6,cy+s*0.4,cx+s*0.6,cy+s*0.4); L(cx,cy,cx,cy+s*0.4)
-            elseif chStyle=="Arrow Down" then
-                L(cx,cy+s,cx-s*0.6,cy-s*0.4); L(cx,cy+s,cx+s*0.6,cy-s*0.4)
-                L(cx-s*0.6,cy-s*0.4,cx+s*0.6,cy-s*0.4); L(cx,cy,cx,cy-s*0.4)
-            elseif chStyle=="Reticle Ring" then
-                C(cx,cy,s); C(cx,cy,s*0.12,true)
-                L(cx-s*1.5,cy,cx-s*1.08,cy); L(cx+s*1.08,cy,cx+s*1.5,cy)
-                L(cx,cy-s*1.5,cx,cy-s*1.08); L(cx,cy+s*1.08,cx,cy+s*1.5)
-            elseif chStyle=="Brackets" then
-                L(cx-s,cy-s*0.6,cx-s,cy+s*0.6); L(cx-s,cy-s*0.6,cx-s+s*0.3,cy-s*0.6); L(cx-s,cy+s*0.6,cx-s+s*0.3,cy+s*0.6)
-                L(cx+s,cy-s*0.6,cx+s,cy+s*0.6); L(cx+s,cy-s*0.6,cx+s-s*0.3,cy-s*0.6); L(cx+s,cy+s*0.6,cx+s-s*0.3,cy+s*0.6)
-            elseif chStyle=="Hash" then
-                L(cx-s,cy-s*0.35,cx+s,cy-s*0.35); L(cx-s,cy+s*0.35,cx+s,cy+s*0.35)
-                L(cx-s*0.35,cy-s,cx-s*0.35,cy+s); L(cx+s*0.35,cy-s,cx+s*0.35,cy+s)
+            elseif chStyle=="Corner Brackets" then local g=s*0.45; L(cx-s,cy-s,cx-s+g,cy-s); L(cx-s,cy-s,cx-s,cy-s+g); L(cx+s,cy-s,cx+s-g,cy-s); L(cx+s,cy-s,cx+s,cy-s+g); L(cx-s,cy+s,cx-s+g,cy+s); L(cx-s,cy+s,cx-s,cy+s-g); L(cx+s,cy+s,cx+s-g,cy+s); L(cx+s,cy+s,cx+s,cy+s-g)
+            elseif chStyle=="Sniper Scope" then C(cx,cy,s); C(cx,cy,s*0.35); C(cx,cy,s*0.1,true); L(cx-s*1.6,cy,cx-s*1.08,cy); L(cx+s*1.08,cy,cx+s*1.6,cy); L(cx,cy-s*1.6,cx,cy-s*1.08); L(cx,cy+s*1.08,cx,cy+s*1.6)
+            elseif chStyle=="Double Cross" then L(cx-s,cy,cx+s,cy); L(cx,cy-s,cx,cy+s); local d=s*0.6; L(cx-d,cy-d,cx+d,cy+d); L(cx+d,cy-d,cx-d,cy+d)
+            elseif chStyle=="Chevron Up" then L(cx-s,cy+s*0.5,cx,cy-s*0.5); L(cx,cy-s*0.5,cx+s,cy+s*0.5); L(cx-s*0.55,cy+s*0.85,cx,cy-s*0.15); L(cx,cy-s*0.15,cx+s*0.55,cy+s*0.85)
+            elseif chStyle=="Chevron Down" then L(cx-s,cy-s*0.5,cx,cy+s*0.5); L(cx,cy+s*0.5,cx+s,cy-s*0.5); L(cx-s*0.55,cy-s*0.85,cx,cy+s*0.15); L(cx,cy+s*0.15,cx+s*0.55,cy-s*0.85)
+            elseif chStyle=="Arrow Up" then L(cx,cy-s,cx-s*0.6,cy+s*0.4); L(cx,cy-s,cx+s*0.6,cy+s*0.4); L(cx-s*0.6,cy+s*0.4,cx+s*0.6,cy+s*0.4); L(cx,cy,cx,cy+s*0.4)
+            elseif chStyle=="Arrow Down" then L(cx,cy+s,cx-s*0.6,cy-s*0.4); L(cx,cy+s,cx+s*0.6,cy-s*0.4); L(cx-s*0.6,cy-s*0.4,cx+s*0.6,cy-s*0.4); L(cx,cy,cx,cy-s*0.4)
+            elseif chStyle=="Reticle Ring" then C(cx,cy,s); C(cx,cy,s*0.12,true); L(cx-s*1.5,cy,cx-s*1.08,cy); L(cx+s*1.08,cy,cx+s*1.5,cy); L(cx,cy-s*1.5,cx,cy-s*1.08); L(cx,cy+s*1.08,cx,cy+s*1.5)
+            elseif chStyle=="Brackets" then L(cx-s,cy-s*0.6,cx-s,cy+s*0.6); L(cx-s,cy-s*0.6,cx-s+s*0.3,cy-s*0.6); L(cx-s,cy+s*0.6,cx-s+s*0.3,cy+s*0.6); L(cx+s,cy-s*0.6,cx+s,cy+s*0.6); L(cx+s,cy-s*0.6,cx+s-s*0.3,cy-s*0.6); L(cx+s,cy+s*0.6,cx+s-s*0.3,cy+s*0.6)
+            elseif chStyle=="Hash" then L(cx-s,cy-s*0.35,cx+s,cy-s*0.35); L(cx-s,cy+s*0.35,cx+s,cy+s*0.35); L(cx-s*0.35,cy-s,cx-s*0.35,cy+s); L(cx+s*0.35,cy-s,cx+s*0.35,cy+s)
             elseif chStyle=="Equals" then L(cx-s,cy-t*2,cx+s,cy-t*2); L(cx-s,cy+t*2,cx+s,cy+t*2)
-            elseif chStyle=="Star 4pt" then
-                L(cx,cy-s,cx,cy+s); L(cx-s,cy,cx+s,cy)
-                L(cx-s*0.6,cy-s*0.6,cx+s*0.6,cy+s*0.6); L(cx+s*0.6,cy-s*0.6,cx-s*0.6,cy+s*0.6)
-            elseif chStyle=="Star 6pt" then
-                L(cx,cy-s,cx,cy+s); L(cx-s,cy,cx+s,cy)
-                L(cx-s*0.7,cy-s*0.4,cx+s*0.7,cy+s*0.4); L(cx+s*0.7,cy-s*0.4,cx-s*0.7,cy+s*0.4)
-                L(cx-s*0.4,cy-s*0.7,cx+s*0.4,cy+s*0.7); L(cx+s*0.4,cy-s*0.7,cx-s*0.4,cy+s*0.7)
+            elseif chStyle=="Star 4pt" then L(cx,cy-s,cx,cy+s); L(cx-s,cy,cx+s,cy); L(cx-s*0.6,cy-s*0.6,cx+s*0.6,cy+s*0.6); L(cx+s*0.6,cy-s*0.6,cx-s*0.6,cy+s*0.6)
+            elseif chStyle=="Star 6pt" then L(cx,cy-s,cx,cy+s); L(cx-s,cy,cx+s,cy); L(cx-s*0.7,cy-s*0.4,cx+s*0.7,cy+s*0.4); L(cx+s*0.7,cy-s*0.4,cx-s*0.7,cy+s*0.4); L(cx-s*0.4,cy-s*0.7,cx+s*0.4,cy+s*0.7); L(cx+s*0.4,cy-s*0.7,cx-s*0.4,cy+s*0.7)
             elseif chStyle=="Asterisk" then for i=0,5 do local a=i/6*math.pi*2; L(cx,cy,cx+math.cos(a)*s,cy+math.sin(a)*s) end
             elseif chStyle=="Triangle Up" then poly({{cx,cy-s},{cx+s*0.87,cy+s*0.5},{cx-s*0.87,cy+s*0.5}})
             elseif chStyle=="Triangle Down" then poly({{cx,cy+s},{cx+s*0.87,cy-s*0.5},{cx-s*0.87,cy-s*0.5}})
             elseif chStyle=="Bowtie" then poly({{cx-s,cy-s*0.5},{cx+s,cy+s*0.5},{cx+s,cy-s*0.5},{cx-s,cy+s*0.5}})
-            elseif chStyle=="Hourglass" then
-                L(cx-s,cy-s*0.6,cx+s,cy-s*0.6); L(cx-s,cy+s*0.6,cx+s,cy+s*0.6)
-                L(cx-s,cy-s*0.6,cx+s,cy+s*0.6); L(cx+s,cy-s*0.6,cx-s,cy+s*0.6)
-            elseif chStyle=="Pinwheel" then
-                for i=0,3 do local a=i/4*math.pi*2; L(cx,cy,cx+math.cos(a)*s,cy+math.sin(a)*s); L(cx+math.cos(a)*s,cy+math.sin(a)*s,cx+math.cos(a+math.pi*0.55)*s*0.7,cy+math.sin(a+math.pi*0.55)*s*0.7) end
-            elseif chStyle=="Trident" then
-                L(cx,cy-s,cx,cy+s*0.6)
-                L(cx-s*0.5,cy-s*0.3,cx,cy-s); L(cx+s*0.5,cy-s*0.3,cx,cy-s)
-                L(cx-s*0.5,cy-s*0.3,cx-s*0.5,cy-s); L(cx+s*0.5,cy-s*0.3,cx+s*0.5,cy-s)
-            elseif chStyle=="Anchor" then
-                C(cx,cy-s*0.45,s*0.35)
-                L(cx,cy-s*0.1,cx,cy+s*0.9); L(cx-s*0.6,cy+s*0.5,cx+s*0.6,cy+s*0.5)
-                L(cx-s*0.5,cy-s*0.1,cx+s*0.5,cy-s*0.1)
-                L(cx-s*0.6,cy+s*0.5,cx-s*0.4,cy+s*0.9); L(cx+s*0.6,cy+s*0.5,cx+s*0.4,cy+s*0.9)
-            elseif chStyle=="Eye" then
-                local N=20
-                for i=0,N-1 do
-                    local a1=i/N*math.pi; local a2=(i+1)/N*math.pi
-                    L(cx+math.cos(a1)*s,cy+math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy+math.sin(a2)*s*0.4)
-                    L(cx+math.cos(a1)*s,cy-math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy-math.sin(a2)*s*0.4)
-                end
-                C(cx,cy,s*0.18,true)
-            elseif chStyle=="Fish Bone" then
-                L(cx-s,cy,cx+s,cy)
-                for i=1,4 do local bx2=cx-s+i/5*s*2; L(bx2,cy,bx2-s*0.18,cy-s*0.3); L(bx2,cy,bx2-s*0.18,cy+s*0.3) end
-            elseif chStyle=="Two Swords" then
-                L(cx-s*0.55,cy-s,cx-s*0.08,cy+s*0.7); L(cx-s*0.8,cy-s*0.05,cx-s*0.3,cy-s*0.05); C(cx-s*0.08,cy+s*0.7,t+1,true)
-                L(cx+s*0.55,cy-s,cx+s*0.08,cy+s*0.7); L(cx+s*0.8,cy-s*0.05,cx+s*0.3,cy-s*0.05); C(cx+s*0.08,cy+s*0.7,t+1,true)
-            elseif chStyle=="Crown" then
-                L(cx-s,cy+s*0.35,cx+s,cy+s*0.35); L(cx-s,cy+s*0.35,cx-s,cy-s*0.15); L(cx+s,cy+s*0.35,cx+s,cy-s*0.15)
-                L(cx-s,cy-s*0.15,cx-s*0.5,cy-s*0.75); L(cx-s*0.5,cy-s*0.75,cx,cy-s*0.2)
-                L(cx,cy-s*0.2,cx+s*0.5,cy-s*0.75); L(cx+s*0.5,cy-s*0.75,cx+s,cy-s*0.15)
-                C(cx,cy-s*0.1,s*0.14,true)
-            elseif chStyle=="Lightning" then
-                L(cx+s*0.25,cy-s,cx-s*0.05,cy-s*0.05); L(cx-s*0.05,cy-s*0.05,cx+s*0.15,cy-s*0.05)
-                L(cx+s*0.15,cy-s*0.05,cx-s*0.25,cy+s)
-            elseif chStyle=="Heart" then
-                local N=60
-                for i=0,N-1 do
-                    local a1=i/N*math.pi*2; local a2=(i+1)/N*math.pi*2
-                    local function hx(a) return cx+s*0.45*(16*math.sin(a)^3)/16 end
-                    local function hy(a) return cy-s*0.45*(13*math.cos(a)-5*math.cos(2*a)-2*math.cos(3*a)-math.cos(4*a))/16 end
-                    L(hx(a1),hy(a1),hx(a2),hy(a2))
-                end
-            elseif chStyle=="Infinity" then
-                local N=80; local a2=s*0.8
-                for i=0,N-1 do
-                    local t1=i/N*math.pi*2; local t2=(i+1)/N*math.pi*2
-                    local function lx(tt) return cx+a2*math.cos(tt)/(1+math.sin(tt)^2) end
-                    local function ly(tt) return cy+a2*math.sin(tt)*math.cos(tt)/(1+math.sin(tt)^2) end
-                    L(lx(t1),ly(t1),lx(t2),ly(t2))
-                end
-            elseif chStyle=="Flower" then
-                for i=0,7 do local a=i/8*math.pi*2; C(cx+math.cos(a)*s*0.6,cy+math.sin(a)*s*0.6,s*0.28) end
-                C(cx,cy,s*0.18,true)
-            elseif chStyle=="Rose" then
-                local N=100
-                for i=0,N-1 do
-                    local a1=i/N*math.pi*4; local a2=(i+1)/N*math.pi*4
-                    local function rx(aa) return cx+math.cos(3*aa)*math.cos(aa)*s end
-                    local function ry(aa) return cy+math.cos(3*aa)*math.sin(aa)*s end
-                    L(rx(a1),ry(a1),rx(a2),ry(a2))
-                end
-            elseif chStyle=="Spiral" then
-                local N=80
-                for i=0,N-1 do
-                    local a1=i/N*math.pi*6; local r1=i/N*s; local a2=(i+1)/N*math.pi*6; local r2=(i+1)/N*s
-                    L(cx+math.cos(a1)*r1,cy+math.sin(a1)*r1,cx+math.cos(a2)*r2,cy+math.sin(a2)*r2)
-                end
-            elseif chStyle=="Fence" then
-                L(cx-s,cy-s*0.4,cx+s,cy-s*0.4); L(cx-s,cy+s*0.4,cx+s,cy+s*0.4)
-                for i=0,4 do local px=cx-s+i/4*s*2; L(px,cy-s*0.8,px,cy+s*0.8) end
-            elseif chStyle=="Radar" then
-                C(cx,cy,s); C(cx,cy,s*0.55); C(cx,cy,s*0.2,true)
-                L(cx,cy,cx+math.cos(-math.pi/4)*s,cy+math.sin(-math.pi/4)*s)
-                L(cx,cy,cx+math.cos(-math.pi/8)*s,cy+math.sin(-math.pi/8)*s)
+            elseif chStyle=="Hourglass" then L(cx-s,cy-s*0.6,cx+s,cy-s*0.6); L(cx-s,cy+s*0.6,cx+s,cy+s*0.6); L(cx-s,cy-s*0.6,cx+s,cy+s*0.6); L(cx+s,cy-s*0.6,cx-s,cy+s*0.6)
+            elseif chStyle=="Pinwheel" then for i=0,3 do local a=i/4*math.pi*2; L(cx,cy,cx+math.cos(a)*s,cy+math.sin(a)*s); L(cx+math.cos(a)*s,cy+math.sin(a)*s,cx+math.cos(a+math.pi*0.55)*s*0.7,cy+math.sin(a+math.pi*0.55)*s*0.7) end
+            elseif chStyle=="Trident" then L(cx,cy-s,cx,cy+s*0.6); L(cx-s*0.5,cy-s*0.3,cx,cy-s); L(cx+s*0.5,cy-s*0.3,cx,cy-s); L(cx-s*0.5,cy-s*0.3,cx-s*0.5,cy-s); L(cx+s*0.5,cy-s*0.3,cx+s*0.5,cy-s)
+            elseif chStyle=="Anchor" then C(cx,cy-s*0.45,s*0.35); L(cx,cy-s*0.1,cx,cy+s*0.9); L(cx-s*0.6,cy+s*0.5,cx+s*0.6,cy+s*0.5); L(cx-s*0.5,cy-s*0.1,cx+s*0.5,cy-s*0.1); L(cx-s*0.6,cy+s*0.5,cx-s*0.4,cy+s*0.9); L(cx+s*0.6,cy+s*0.5,cx+s*0.4,cy+s*0.9)
+            elseif chStyle=="Eye" then local N=20; for i=0,N-1 do local a1=i/N*math.pi; local a2=(i+1)/N*math.pi; L(cx+math.cos(a1)*s,cy+math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy+math.sin(a2)*s*0.4); L(cx+math.cos(a1)*s,cy-math.sin(a1)*s*0.4,cx+math.cos(a2)*s,cy-math.sin(a2)*s*0.4) end; C(cx,cy,s*0.18,true)
+            elseif chStyle=="Fish Bone" then L(cx-s,cy,cx+s,cy); for i=1,4 do local bx2=cx-s+i/5*s*2; L(bx2,cy,bx2-s*0.18,cy-s*0.3); L(bx2,cy,bx2-s*0.18,cy+s*0.3) end
+            elseif chStyle=="Two Swords" then L(cx-s*0.55,cy-s,cx-s*0.08,cy+s*0.7); L(cx-s*0.8,cy-s*0.05,cx-s*0.3,cy-s*0.05); C(cx-s*0.08,cy+s*0.7,t+1,true); L(cx+s*0.55,cy-s,cx+s*0.08,cy+s*0.7); L(cx+s*0.8,cy-s*0.05,cx+s*0.3,cy-s*0.05); C(cx+s*0.08,cy+s*0.7,t+1,true)
+            elseif chStyle=="Crown" then L(cx-s,cy+s*0.35,cx+s,cy+s*0.35); L(cx-s,cy+s*0.35,cx-s,cy-s*0.15); L(cx+s,cy+s*0.35,cx+s,cy-s*0.15); L(cx-s,cy-s*0.15,cx-s*0.5,cy-s*0.75); L(cx-s*0.5,cy-s*0.75,cx,cy-s*0.2); L(cx,cy-s*0.2,cx+s*0.5,cy-s*0.75); L(cx+s*0.5,cy-s*0.75,cx+s,cy-s*0.15); C(cx,cy-s*0.1,s*0.14,true)
+            elseif chStyle=="Lightning" then L(cx+s*0.25,cy-s,cx-s*0.05,cy-s*0.05); L(cx-s*0.05,cy-s*0.05,cx+s*0.15,cy-s*0.05); L(cx+s*0.15,cy-s*0.05,cx-s*0.25,cy+s)
+            elseif chStyle=="Heart" then local N=60; for i=0,N-1 do local a1=i/N*math.pi*2; local a2=(i+1)/N*math.pi*2; local function hx(a) return cx+s*0.45*(16*math.sin(a)^3)/16 end; local function hy(a) return cy-s*0.45*(13*math.cos(a)-5*math.cos(2*a)-2*math.cos(3*a)-math.cos(4*a))/16 end; L(hx(a1),hy(a1),hx(a2),hy(a2)) end
+            elseif chStyle=="Infinity" then local N=80; local a2=s*0.8; for i=0,N-1 do local t1=i/N*math.pi*2; local t2=(i+1)/N*math.pi*2; local function lx(tt) return cx+a2*math.cos(tt)/(1+math.sin(tt)^2) end; local function ly(tt) return cy+a2*math.sin(tt)*math.cos(tt)/(1+math.sin(tt)^2) end; L(lx(t1),ly(t1),lx(t2),ly(t2)) end
+            elseif chStyle=="Flower" then for i=0,7 do local a=i/8*math.pi*2; C(cx+math.cos(a)*s*0.6,cy+math.sin(a)*s*0.6,s*0.28) end; C(cx,cy,s*0.18,true)
+            elseif chStyle=="Rose" then local N=100; for i=0,N-1 do local a1=i/N*math.pi*4; local a2=(i+1)/N*math.pi*4; local function rx(aa) return cx+math.cos(3*aa)*math.cos(aa)*s end; local function ry(aa) return cy+math.cos(3*aa)*math.sin(aa)*s end; L(rx(a1),ry(a1),rx(a2),ry(a2)) end
+            elseif chStyle=="Spiral" then local N=80; for i=0,N-1 do local a1=i/N*math.pi*6; local r1=i/N*s; local a2=(i+1)/N*math.pi*6; local r2=(i+1)/N*s; L(cx+math.cos(a1)*r1,cy+math.sin(a1)*r1,cx+math.cos(a2)*r2,cy+math.sin(a2)*r2) end
+            elseif chStyle=="Fence" then L(cx-s,cy-s*0.4,cx+s,cy-s*0.4); L(cx-s,cy+s*0.4,cx+s,cy+s*0.4); for i=0,4 do local px=cx-s+i/4*s*2; L(px,cy-s*0.8,px,cy+s*0.8) end
+            elseif chStyle=="Radar" then C(cx,cy,s); C(cx,cy,s*0.55); C(cx,cy,s*0.2,true); L(cx,cy,cx+math.cos(-math.pi/4)*s,cy+math.sin(-math.pi/4)*s); L(cx,cy,cx+math.cos(-math.pi/8)*s,cy+math.sin(-math.pi/8)*s)
             elseif chStyle=="Pentagon" then ngon(cx,cy,s,5,-math.pi/2)
             elseif chStyle=="Hexagon" then ngon(cx,cy,s,6,0)
-            elseif chStyle=="Plus Bold" then
-                local hw=t*2
-                L(cx-s,cy,cx+s,cy,hw*2); L(cx,cy-s,cx,cy+s,hw*2)
-            elseif chStyle=="Cross Gap" then
-                local gap=s*0.25
-                L(cx-s,cy,cx-gap,cy); L(cx+gap,cy,cx+s,cy)
-                L(cx,cy-s,cx,cy-gap); L(cx,cy+gap,cx,cy+s)
-                C(cx,cy,gap*0.4)
-            elseif chStyle=="NATO Sight" then
-                C(cx,cy,s*0.8); L(cx-s*1.4,cy,cx+s*1.4,cy); L(cx,cy-s*1.4,cx,cy+s*1.4); C(cx,cy,s*0.15,true)
-            elseif chStyle=="Biohazard Arms" then
-                for i=0,2 do local a=i/3*math.pi*2-math.pi/2; C(cx+math.cos(a)*s*0.4,cy+math.sin(a)*s*0.4,s*0.35) end
-                C(cx,cy,s*0.18); C(cx,cy,s*0.08,true)
-            elseif chStyle=="Crossbow Sight" then
-                C(cx,cy,s); L(cx-s,cy,cx+s,cy)
-                L(cx-s*0.5,cy-s*0.3,cx,cy); L(cx+s*0.5,cy-s*0.3,cx,cy); L(cx,cy,cx,cy+s*0.6)
-            elseif chStyle=="Sunburst" then
-                C(cx,cy,s*0.3)
-                for i=0,7 do local a=i/8*math.pi*2; L(cx+math.cos(a)*s*0.38,cy+math.sin(a)*s*0.38,cx+math.cos(a)*s,cy+math.sin(a)*s) end
-            elseif chStyle=="Death Cross" then
-                L(cx-s*0.25,cy-s,cx+s*0.25,cy-s); L(cx-s*0.25,cy-s,cx-s*0.25,cy-s*0.35); L(cx+s*0.25,cy-s,cx+s*0.25,cy-s*0.35)
-                L(cx-s*0.5,cy-s*0.35,cx+s*0.5,cy-s*0.35); L(cx-s*0.5,cy-s*0.35,cx-s*0.18,cy+s); L(cx+s*0.5,cy-s*0.35,cx+s*0.18,cy+s)
-                L(cx-s*0.18,cy+s,cx+s*0.18,cy+s)
-            elseif chStyle=="Holy Cross" then
-                L(cx-s*0.2,cy-s,cx+s*0.2,cy-s); L(cx-s*0.2,cy-s,cx-s*0.2,cy-s*0.4); L(cx+s*0.2,cy-s,cx+s*0.2,cy-s*0.4)
-                L(cx-s*0.5,cy-s*0.4,cx+s*0.5,cy-s*0.4); L(cx-s*0.5,cy-s*0.4,cx-s*0.2,cy+s)
-                L(cx+s*0.5,cy-s*0.4,cx+s*0.2,cy+s); L(cx-s*0.2,cy+s,cx+s*0.2,cy+s)
-            end
+            elseif chStyle=="Plus Bold" then local hw=t*2; L(cx-s,cy,cx+s,cy,hw*2); L(cx,cy-s,cx,cy+s,hw*2)
+            elseif chStyle=="Cross Gap" then local gap=s*0.25; L(cx-s,cy,cx-gap,cy); L(cx+gap,cy,cx+s,cy); L(cx,cy-s,cx,cy-gap); L(cx,cy+gap,cx,cy+s); C(cx,cy,gap*0.4)
+            elseif chStyle=="NATO Sight" then C(cx,cy,s*0.8); L(cx-s*1.4,cy,cx+s*1.4,cy); L(cx,cy-s*1.4,cx,cy+s*1.4); C(cx,cy,s*0.15,true)
+            elseif chStyle=="Biohazard Arms" then for i=0,2 do local a=i/3*math.pi*2-math.pi/2; C(cx+math.cos(a)*s*0.4,cy+math.sin(a)*s*0.4,s*0.35) end; C(cx,cy,s*0.18); C(cx,cy,s*0.08,true)
+            elseif chStyle=="Crossbow Sight" then C(cx,cy,s); L(cx-s,cy,cx+s,cy); L(cx-s*0.5,cy-s*0.3,cx,cy); L(cx+s*0.5,cy-s*0.3,cx,cy); L(cx,cy,cx,cy+s*0.6)
+            elseif chStyle=="Sunburst" then C(cx,cy,s*0.3); for i=0,7 do local a=i/8*math.pi*2; L(cx+math.cos(a)*s*0.38,cy+math.sin(a)*s*0.38,cx+math.cos(a)*s,cy+math.sin(a)*s) end
+            elseif chStyle=="Death Cross" then L(cx-s*0.25,cy-s,cx+s*0.25,cy-s); L(cx-s*0.25,cy-s,cx-s*0.25,cy-s*0.35); L(cx+s*0.25,cy-s,cx+s*0.25,cy-s*0.35); L(cx-s*0.5,cy-s*0.35,cx+s*0.5,cy-s*0.35); L(cx-s*0.5,cy-s*0.35,cx-s*0.18,cy+s); L(cx+s*0.5,cy-s*0.35,cx+s*0.18,cy+s); L(cx-s*0.18,cy+s,cx+s*0.18,cy+s)
+            elseif chStyle=="Holy Cross" then L(cx-s*0.2,cy-s,cx+s*0.2,cy-s); L(cx-s*0.2,cy-s,cx-s*0.2,cy-s*0.4); L(cx+s*0.2,cy-s,cx+s*0.2,cy-s*0.4); L(cx-s*0.5,cy-s*0.4,cx+s*0.5,cy-s*0.4); L(cx-s*0.5,cy-s*0.4,cx-s*0.2,cy+s); L(cx+s*0.5,cy-s*0.4,cx+s*0.2,cy+s); L(cx-s*0.2,cy+s,cx+s*0.2,cy+s) end
         end)
     else ExtrasRightGroupBox:AddLabel("[L] Custom Crosshair - Lifetime Only") end
 
     -- ================================================
-    -- MAP COLOR CHANGER LOGIC
+    -- MAP COLOR CHANGER LOGIC — FIXED BRIGHTNESS
     -- ================================================
     local origAmb=Lighting.Ambient; local origOut=Lighting.OutdoorAmbient; local origBri=Lighting.Brightness
     local origCST=Lighting.ColorShift_Top; local origCSB=Lighting.ColorShift_Bottom; local mapEnabled=false
@@ -1600,19 +1564,20 @@ tryAutoExec(function(isAdmin,tier)
     if isLifetime then
         MapLeftGB:AddToggle("MapColorToggle",{Text="Enable Map Color Changer",Default=false,Callback=function(v) if featuresLocked then Toggles.MapColorToggle:SetValue(false) return end; mapEnabled=v; if not v then resetMap() end end})
         MapLeftGB:AddDivider(); MapLeftGB:AddLabel("Enable toggle first then pick preset:")
+        -- FIXED: Brightness values raised, tint colors softened so map stays visible
         local presets={
-            {"Black",      function() Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(15,15,15); Lighting.OutdoorAmbient=Color3.fromRGB(15,15,15); local cc=getCC(); cc.Brightness=-0.15; cc.Contrast=0.2; cc.Saturation=-0.15; cc.TintColor=Color3.fromRGB(60,60,60) end},
-            {"Dark Red",   function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(40,5,5); Lighting.OutdoorAmbient=Color3.fromRGB(40,5,5); local cc=getCC(); cc.TintColor=Color3.fromRGB(190,70,70); cc.Saturation=0.25; cc.Brightness=-0.1; cc.Contrast=0.15 end},
-            {"Dark Blue",  function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(5,5,40); Lighting.OutdoorAmbient=Color3.fromRGB(5,5,40); local cc=getCC(); cc.TintColor=Color3.fromRGB(70,70,190); cc.Saturation=0.25; cc.Brightness=-0.1; cc.Contrast=0.15 end},
-            {"Dark Green", function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(5,30,5); Lighting.OutdoorAmbient=Color3.fromRGB(5,30,5); local cc=getCC(); cc.TintColor=Color3.fromRGB(70,170,70); cc.Saturation=0.25; cc.Brightness=-0.1; cc.Contrast=0.15 end},
-            {"Dark Purple",function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(20,5,30); Lighting.OutdoorAmbient=Color3.fromRGB(20,5,30); local cc=getCC(); cc.TintColor=Color3.fromRGB(130,60,190); cc.Saturation=0.25; cc.Brightness=-0.1; cc.Contrast=0.15 end},
-            {"Night",      function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(25,25,50); Lighting.OutdoorAmbient=Color3.fromRGB(25,25,50); local cc=getCC(); cc.Brightness=-0.08; cc.Contrast=0.12; cc.Saturation=-0.08; cc.TintColor=Color3.fromRGB(85,85,200) end},
-            {"Sunset",     function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(220,110,50); cc.Brightness=-0.05; cc.Saturation=0.25; cc.Contrast=0.12 end},
-            {"Neon",       function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(50,200,130); cc.Brightness=-0.05; cc.Saturation=0.45; cc.Contrast=0.18 end},
-            {"Sepia",      function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(190,150,100); cc.Saturation=-0.18; cc.Brightness=-0.05; cc.Contrast=0.12 end},
-            {"Greyscale",  function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=-1; cc.Brightness=-0.05; cc.Contrast=0.1 end},
-            {"Vivid",      function() Lighting.Brightness=1.1; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=0.6; cc.Brightness=0; cc.Contrast=0.2 end},
-            {"Cold",       function() Lighting.Brightness=0.9; local cc=getCC(); cc.TintColor=Color3.fromRGB(100,140,210); cc.Saturation=0.2; cc.Brightness=-0.08; cc.Contrast=0.12 end},
+            {"Black",      function() Lighting.Brightness=0.85; Lighting.Ambient=Color3.fromRGB(25,25,25); Lighting.OutdoorAmbient=Color3.fromRGB(25,25,25); local cc=getCC(); cc.Brightness=-0.06; cc.Contrast=0.12; cc.Saturation=-0.1; cc.TintColor=Color3.fromRGB(90,90,90) end},
+            {"Dark Red",   function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(55,15,15); Lighting.OutdoorAmbient=Color3.fromRGB(55,15,15); local cc=getCC(); cc.TintColor=Color3.fromRGB(215,120,120); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
+            {"Dark Blue",  function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(15,15,55); Lighting.OutdoorAmbient=Color3.fromRGB(15,15,55); local cc=getCC(); cc.TintColor=Color3.fromRGB(120,120,215); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
+            {"Dark Green", function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(15,45,15); Lighting.OutdoorAmbient=Color3.fromRGB(15,45,15); local cc=getCC(); cc.TintColor=Color3.fromRGB(120,205,120); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
+            {"Dark Purple",function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(30,15,50); Lighting.OutdoorAmbient=Color3.fromRGB(30,15,50); local cc=getCC(); cc.TintColor=Color3.fromRGB(165,110,225); cc.Saturation=0.18; cc.Brightness=-0.03; cc.Contrast=0.08 end},
+            {"Night",      function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(35,35,65); Lighting.OutdoorAmbient=Color3.fromRGB(35,35,65); local cc=getCC(); cc.Brightness=-0.04; cc.Contrast=0.08; cc.Saturation=-0.04; cc.TintColor=Color3.fromRGB(105,105,215) end},
+            {"Sunset",     function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(220,130,70); cc.Brightness=0; cc.Saturation=0.2; cc.Contrast=0.1 end},
+            {"Neon",       function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(80,220,150); cc.Brightness=0; cc.Saturation=0.4; cc.Contrast=0.15 end},
+            {"Sepia",      function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(200,165,120); cc.Saturation=-0.15; cc.Brightness=0; cc.Contrast=0.1 end},
+            {"Greyscale",  function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=-1; cc.Brightness=0; cc.Contrast=0.08 end},
+            {"Vivid",      function() Lighting.Brightness=1.1; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=0.6; cc.Brightness=0.05; cc.Contrast=0.2 end},
+            {"Cold",       function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(120,155,220); cc.Saturation=0.15; cc.Brightness=-0.02; cc.Contrast=0.1 end},
         }
         for _,preset in ipairs(presets) do
             local p=preset
@@ -1631,94 +1596,78 @@ tryAutoExec(function(isAdmin,tier)
     end
 
     -- ================================================
-    -- SKY CHANGER LOGIC
+    -- SKY CHANGER LOGIC — FIXED (Atmosphere + Lighting, no asset IDs)
     -- ================================================
-    local origSky=nil
+    local origSky = nil
+    local origClockTime = Lighting.ClockTime
+    local origBrightness2 = Lighting.Brightness
+    local origAmb2 = Lighting.Ambient
+    local origOut2 = Lighting.OutdoorAmbient
+
     local function saveSky()
-        if not origSky then
-            local s=Lighting:FindFirstChildOfClass("Sky")
-            if s then origSky={Bk=s.SkyboxBk,Dn=s.SkyboxDn,Ft=s.SkyboxFt,Lf=s.SkyboxLf,Rt=s.SkyboxRt,Up=s.SkyboxUp} end
+        if origSky then return end
+        local sky=Lighting:FindFirstChildOfClass("Sky")
+        if sky then
+            origSky={Bk=sky.SkyboxBk,Dn=sky.SkyboxDn,Ft=sky.SkyboxFt,Lf=sky.SkyboxLf,Rt=sky.SkyboxRt,Up=sky.SkyboxUp}
+        else
+            origSky={none=true}
         end
     end
-    local function applySky(id)
-        saveSky()
-        local sky=Lighting:FindFirstChildOfClass("Sky")
-        if not sky then sky=Instance.new("Sky"); sky.Parent=Lighting end
-        -- Apply the ID to all 6 faces
-        sky.SkyboxBk=id; sky.SkyboxDn=id; sky.SkyboxFt=id
-        sky.SkyboxLf=id; sky.SkyboxRt=id; sky.SkyboxUp=id
+
+    local function getOrCreateAtm()
+        local atm=Lighting:FindFirstChild("RivalsAtm")
+        if not atm then atm=Instance.new("Atmosphere"); atm.Name="RivalsAtm"; atm.Parent=Lighting end
+        return atm
     end
+
     local function resetSky()
-        if origSky then
+        if origSky and not origSky.none then
             local sky=Lighting:FindFirstChildOfClass("Sky")
             if sky then sky.SkyboxBk=origSky.Bk; sky.SkyboxDn=origSky.Dn; sky.SkyboxFt=origSky.Ft; sky.SkyboxLf=origSky.Lf; sky.SkyboxRt=origSky.Rt; sky.SkyboxUp=origSky.Up end
         end
+        local ratm=Lighting:FindFirstChild("RivalsAtm"); if ratm then ratm:Destroy() end
+        Lighting.ClockTime=origClockTime
+        Lighting.Brightness=origBrightness2
+        Lighting.Ambient=origAmb2
+        Lighting.OutdoorAmbient=origOut2
     end
 
-    -- Sky presets: each uses a solid-color panoramic sky asset confirmed on Roblox
-    -- These are Roblox's own default sky face textures which are always available
     local SKY_PRESETS={
-        {name="Default Blue",   bk="rbxasset://textures/sky/sky512_bk.tex", dn="rbxasset://textures/sky/sky512_dn.tex", ft="rbxasset://textures/sky/sky512_ft.tex", lf="rbxasset://textures/sky/sky512_lf.tex", rt="rbxasset://textures/sky/sky512_rt.tex", up="rbxasset://textures/sky/sky512_up.tex"},
-        {name="Space",          bk="rbxassetid://1012556285", dn="rbxassetid://1012556285", ft="rbxassetid://1012556285", lf="rbxassetid://1012556285", rt="rbxassetid://1012556285", up="rbxassetid://1012556285"},
-        {name="Blaze Orange",   bk="rbxassetid://159454286", dn="rbxassetid://159454286", ft="rbxassetid://159454286", lf="rbxassetid://159454286", rt="rbxassetid://159454286", up="rbxassetid://159454286"},
-        {name="Deep Night",     bk="rbxassetid://159454296", dn="rbxassetid://159454296", ft="rbxassetid://159454296", lf="rbxassetid://159454296", rt="rbxassetid://159454296", up="rbxassetid://159454296"},
-        {name="Blood Moon",     bk="rbxassetid://159454299", dn="rbxassetid://159454299", ft="rbxassetid://159454299", lf="rbxassetid://159454299", rt="rbxassetid://159454299", up="rbxassetid://159454299"},
-        {name="Arctic White",   bk="rbxassetid://159454293", dn="rbxassetid://159454293", ft="rbxassetid://159454293", lf="rbxassetid://159454293", rt="rbxassetid://159454293", up="rbxassetid://159454293"},
-        {name="Pitch Black",    bk="rbxassetid://159454300", dn="rbxassetid://159454300", ft="rbxassetid://159454300", lf="rbxassetid://159454300", rt="rbxassetid://159454300", up="rbxassetid://159454300"},
-        {name="Ocean Blue",     bk="rbxassetid://159454297", dn="rbxassetid://159454297", ft="rbxassetid://159454297", lf="rbxassetid://159454297", rt="rbxassetid://159454297", up="rbxassetid://159454297"},
-        {name="Cotton Candy",   bk="rbxassetid://159454298", dn="rbxassetid://159454298", ft="rbxassetid://159454298", lf="rbxassetid://159454298", rt="rbxassetid://159454298", up="rbxassetid://159454298"},
-        {name="Radioactive",    bk="rbxassetid://159454294", dn="rbxassetid://159454294", ft="rbxassetid://159454294", lf="rbxassetid://159454294", rt="rbxassetid://159454294", up="rbxassetid://159454294"},
-        {name="Electric",       bk="rbxassetid://159454295", dn="rbxassetid://159454295", ft="rbxassetid://159454295", lf="rbxassetid://159454295", rt="rbxassetid://159454295", up="rbxassetid://159454295"},
-        {name="Classic Roblox", bk="rbxassetid://159454302", dn="rbxassetid://159454302", ft="rbxassetid://159454302", lf="rbxassetid://159454302", rt="rbxassetid://159454302", up="rbxassetid://159454302"},
-        {name="Star Field",     bk="rbxassetid://159454301", dn="rbxassetid://159454301", ft="rbxassetid://159454301", lf="rbxassetid://159454301", rt="rbxassetid://159454301", up="rbxassetid://159454301"},
-        {name="Lava",           bk="rbxassetid://159454303", dn="rbxassetid://159454303", ft="rbxassetid://159454303", lf="rbxassetid://159454303", rt="rbxassetid://159454303", up="rbxassetid://159454303"},
-        {name="Jungle",         bk="rbxassetid://159454304", dn="rbxassetid://159454304", ft="rbxassetid://159454304", lf="rbxassetid://159454304", rt="rbxassetid://159454304", up="rbxassetid://159454304"},
-        {name="Tundra",         bk="rbxassetid://159454305", dn="rbxassetid://159454305", ft="rbxassetid://159454305", lf="rbxassetid://159454305", rt="rbxassetid://159454305", up="rbxassetid://159454305"},
-        {name="Desert",         bk="rbxassetid://159454306", dn="rbxassetid://159454306", ft="rbxassetid://159454306", lf="rbxassetid://159454306", rt="rbxassetid://159454306", up="rbxassetid://159454306"},
-        {name="Galaxy",         bk="rbxassetid://159454307", dn="rbxassetid://159454307", ft="rbxassetid://159454307", lf="rbxassetid://159454307", rt="rbxassetid://159454307", up="rbxassetid://159454307"},
-        {name="Underwater",     bk="rbxassetid://159454308", dn="rbxassetid://159454308", ft="rbxassetid://159454308", lf="rbxassetid://159454308", rt="rbxassetid://159454308", up="rbxassetid://159454308"},
-        {name="Sunrise",        bk="rbxassetid://159454309", dn="rbxassetid://159454309", ft="rbxassetid://159454309", lf="rbxassetid://159454309", rt="rbxassetid://159454309", up="rbxassetid://159454309"},
+        {name="Space",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.3; Lighting.Ambient=Color3.fromRGB(0,0,10); Lighting.OutdoorAmbient=Color3.fromRGB(0,0,10); local a=getOrCreateAtm(); a.Density=0; a.Offset=0.25; a.Color=Color3.fromRGB(5,5,20); a.Decay=Color3.fromRGB(0,0,0); a.Glare=0; a.Haze=0 end},
+        {name="Blood Moon",apply=function() saveSky(); Lighting.ClockTime=1; Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(40,0,0); Lighting.OutdoorAmbient=Color3.fromRGB(40,0,0); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(160,20,20); a.Decay=Color3.fromRGB(80,0,0); a.Glare=0.3; a.Haze=3 end},
+        {name="Deep Night",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(5,5,25); Lighting.OutdoorAmbient=Color3.fromRGB(5,5,25); local a=getOrCreateAtm(); a.Density=0.2; a.Offset=0.1; a.Color=Color3.fromRGB(10,10,60); a.Decay=Color3.fromRGB(5,5,30); a.Glare=0.1; a.Haze=1 end},
+        {name="Sunset",apply=function() saveSky(); Lighting.ClockTime=18.5; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(90,45,20); Lighting.OutdoorAmbient=Color3.fromRGB(110,65,30); local a=getOrCreateAtm(); a.Density=0.4; a.Offset=0.25; a.Color=Color3.fromRGB(199,170,107); a.Decay=Color3.fromRGB(255,75,0); a.Glare=0.5; a.Haze=2.5 end},
+        {name="Arctic White",apply=function() saveSky(); Lighting.ClockTime=12; Lighting.Brightness=1.5; Lighting.Ambient=Color3.fromRGB(160,180,200); Lighting.OutdoorAmbient=Color3.fromRGB(180,200,220); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(180,200,230); a.Decay=Color3.fromRGB(200,220,255); a.Glare=0.4; a.Haze=2 end},
+        {name="Neon City",apply=function() saveSky(); Lighting.ClockTime=22; Lighting.Brightness=0.6; Lighting.Ambient=Color3.fromRGB(20,0,40); Lighting.OutdoorAmbient=Color3.fromRGB(20,0,40); local a=getOrCreateAtm(); a.Density=0.4; a.Offset=0.1; a.Color=Color3.fromRGB(100,0,200); a.Decay=Color3.fromRGB(200,0,100); a.Glare=0.6; a.Haze=4 end},
+        {name="Ocean Blue",apply=function() saveSky(); Lighting.ClockTime=14; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(20,50,100); Lighting.OutdoorAmbient=Color3.fromRGB(30,70,140); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.2; a.Color=Color3.fromRGB(50,120,200); a.Decay=Color3.fromRGB(30,80,150); a.Glare=0.3; a.Haze=2 end},
+        {name="Toxic",apply=function() saveSky(); Lighting.ClockTime=12; Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(10,40,10); Lighting.OutdoorAmbient=Color3.fromRGB(10,50,10); local a=getOrCreateAtm(); a.Density=0.5; a.Offset=0.1; a.Color=Color3.fromRGB(80,200,50); a.Decay=Color3.fromRGB(30,100,20); a.Glare=0.3; a.Haze=5 end},
+        {name="Desert",apply=function() saveSky(); Lighting.ClockTime=13; Lighting.Brightness=1.4; Lighting.Ambient=Color3.fromRGB(120,90,50); Lighting.OutdoorAmbient=Color3.fromRGB(150,110,60); local a=getOrCreateAtm(); a.Density=0.35; a.Offset=0.2; a.Color=Color3.fromRGB(210,180,120); a.Decay=Color3.fromRGB(180,130,70); a.Glare=0.6; a.Haze=3 end},
+        {name="Apocalypse",apply=function() saveSky(); Lighting.ClockTime=16; Lighting.Brightness=0.8; Lighting.Ambient=Color3.fromRGB(70,25,0); Lighting.OutdoorAmbient=Color3.fromRGB(70,25,0); local a=getOrCreateAtm(); a.Density=0.5; a.Offset=0.15; a.Color=Color3.fromRGB(200,80,30); a.Decay=Color3.fromRGB(150,40,10); a.Glare=0.5; a.Haze=5 end},
+        {name="Galaxy",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.2; Lighting.Ambient=Color3.fromRGB(5,0,15); Lighting.OutdoorAmbient=Color3.fromRGB(5,0,15); local a=getOrCreateAtm(); a.Density=0; a.Offset=0; a.Color=Color3.fromRGB(30,0,60); a.Decay=Color3.fromRGB(10,0,30); a.Glare=0; a.Haze=0 end},
+        {name="Sunny Day",apply=function() saveSky(); Lighting.ClockTime=14; Lighting.Brightness=1.5; Lighting.Ambient=Color3.fromRGB(120,130,140); Lighting.OutdoorAmbient=Color3.fromRGB(140,150,160); local a=getOrCreateAtm(); a.Density=0.395; a.Offset=0.25; a.Color=Color3.fromRGB(199,199,199); a.Decay=Color3.fromRGB(160,160,160); a.Glare=0.3; a.Haze=0 end},
+        {name="Cotton Candy",apply=function() saveSky(); Lighting.ClockTime=15; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(180,120,180); Lighting.OutdoorAmbient=Color3.fromRGB(200,140,200); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.15; a.Color=Color3.fromRGB(230,170,230); a.Decay=Color3.fromRGB(200,140,210); a.Glare=0.4; a.Haze=2 end},
+        {name="Midnight Purple",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.4; Lighting.Ambient=Color3.fromRGB(20,5,35); Lighting.OutdoorAmbient=Color3.fromRGB(20,5,35); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(80,20,140); a.Decay=Color3.fromRGB(40,5,80); a.Glare=0.2; a.Haze=2 end},
     }
 
     local SkyLeftGB=Tabs.SkyChanger:AddLeftGroupbox("Sky Presets")
-    local SkyRightGB=Tabs.SkyChanger:AddRightGroupbox("Custom Sky")
+    local SkyRightGB=Tabs.SkyChanger:AddRightGroupbox("Sky Info")
     if isLifetime then
-        SkyLeftGB:AddLabel("Client-side only. Pick a sky preset:")
+        SkyLeftGB:AddLabel("Uses Atmosphere + Lighting - always works:")
         SkyLeftGB:AddDivider()
         local currentSkyLabel=SkyRightGB:AddLabel("Current: Default")
         SkyRightGB:AddDivider()
+        SkyRightGB:AddLabel("Client-side only.")
         SkyRightGB:AddLabel("Other players see the normal sky.")
         SkyRightGB:AddLabel("Resets on script unload.")
-        SkyRightGB:AddDivider()
-        -- Custom ID input
-        SkyRightGB:AddLabel("Custom Sky (same ID all 6 faces):")
-        local customSkyId=""
-        SkyRightGB:AddInput("CustomSkyInput",{Default="",Numeric=false,Finished=false,Text="Asset ID",Placeholder="e.g. 159454302",Callback=function(v) customSkyId=v end})
-        SkyRightGB:AddButton("Apply Custom Sky",function()
-            if featuresLocked then Library:Notify("Locked.",2) return end
-            if customSkyId=="" then Library:Notify("Enter an asset ID.",3) return end
-            local id="rbxassetid://"..customSkyId
-            local sky=Lighting:FindFirstChildOfClass("Sky")
-            if not sky then sky=Instance.new("Sky"); sky.Parent=Lighting end
-            saveSky()
-            sky.SkyboxBk=id; sky.SkyboxDn=id; sky.SkyboxFt=id; sky.SkyboxLf=id; sky.SkyboxRt=id; sky.SkyboxUp=id
-            currentSkyLabel:SetText("Current: Custom ("..customSkyId..")")
-            Library:Notify("Custom sky applied!",3)
-        end)
         SkyRightGB:AddDivider()
         SkyRightGB:AddButton("Reset to Default",function()
             resetSky(); currentSkyLabel:SetText("Current: Default"); Library:Notify("Sky reset!",3)
         end)
-        -- Preset buttons
         for _,preset in ipairs(SKY_PRESETS) do
             local p=preset
             SkyLeftGB:AddButton(p.name,function()
                 if featuresLocked then Library:Notify("Locked.",2) return end
-                saveSky()
-                local sky=Lighting:FindFirstChildOfClass("Sky")
-                if not sky then sky=Instance.new("Sky"); sky.Parent=Lighting end
-                sky.SkyboxBk=p.bk; sky.SkyboxDn=p.dn; sky.SkyboxFt=p.ft
-                sky.SkyboxLf=p.lf; sky.SkyboxRt=p.rt; sky.SkyboxUp=p.up
+                p.apply()
                 currentSkyLabel:SetText("Current: "..p.name)
                 Library:Notify(p.name.." applied!",3)
             end)
@@ -1921,7 +1870,10 @@ tryAutoExec(function(isAdmin,tier)
         if specGui then specGui:Destroy() end
         if hideLoopConn then hideLoopConn:Disconnect() end
         pcall(function() guiCapture:Disconnect() end)
-        resetMap(); resetSky(); showAllGuis()
+        restoreOriginalName()
+        resetMap()
+        resetSky()
+        showAllGuis()
         LocalPlayer.CameraMode=originalCameraType or Enum.CameraMode.Classic
         LocalPlayer.CameraMaxZoomDistance=originalMaxZoom or 128
         LocalPlayer.CameraMinZoomDistance=originalMinZoom or 0.5
