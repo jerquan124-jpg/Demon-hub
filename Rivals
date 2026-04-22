@@ -1,5 +1,5 @@
 -- ================================================
---         RIVALS - thegxx | v3.11
+--         RIVALS - thegxx | v3.12
 --    Key System: Weekly / Monthly / Lifetime
 --    Owner: Demon Executioners
 -- ================================================
@@ -34,7 +34,7 @@ local FIREBASE_URL      = "https://rivalsscript-36ef9-default-rtdb.firebaseio.co
 local DISCORD           = "discord.gg/zp2QNf4j48"
 local SNAPCHAT          = "snapchat.com/t/a0xI9EDj"
 local INSTAGRAM         = "instagram.com/unknown_1096210"
-local ADMIN_KEY         = "jerquan10$"
+local ADMIN_KEY         = "jerquan12$"
 local KEY_FILE          = "rivals_key.txt"
 local WEBHOOK_KEYGEN    = "https://discord.com/api/webhooks/1482926278762823722/3LOenlFymwQbRXbV-V93qERBaVm1v6I_5F3omYlYyFvKalJVcAlR6wqB6Wo9u4oIyE-K"
 local WEBHOOK_BLACKLIST = "https://discord.com/api/webhooks/1482909153415397483/2uN_4is8mqZkeer6cA2YnmvNAm1pel-Ram7lbCGou5S2YESNPEJF5UG6kluiDRNZJhol"
