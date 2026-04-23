@@ -114,15 +114,15 @@ local function hKeygen(title,desc,color,fields) sendHook(WEBHOOK_KEYGEN,title,de
 local function hUpdate(title,desc) sendHook(WEBHOOK_UPDATES,title,desc,5793266) end
 local function hBlacklist(user,uid,reason,isMod)
     if isMod then
-        sendHook(WEBHOOK_BLACKLIST,"Blacklisted by Moderator","A moderator blacklisted a user.",15158332,{
+        sendHook(WEBHOOK_BLACKLIST,"Blacklisted by Staff","A staff member blacklisted a user.",15158332,{
             {name="User",value=user.." ("..tostring(uid)..")",inline=true},
             {name="Reason",value=reason or "No reason",inline=true},
-            {name="Moderator",value=modUsername.." ("..tostring(modUserId)..")",inline=true},
+            {name="Staff",value=modUsername.." ("..tostring(modUserId)..")",inline=true},
         })
     else
-        sendHook(WEBHOOK_BLACKLIST,"Auto-Blacklisted","System blacklisted a user.",15158332,{
+        sendHook(WEBHOOK_BLACKLIST,"Auto-Blacklisted (Key Sharing)","System detected key sharing.",15158332,{
             {name="User",value=user.." ("..tostring(uid)..")",inline=true},
-            {name="Reason",value=reason or "Key sharing",inline=true},
+            {name="Reason",value="Key shared with another account",inline=true},
             {name="Blacklisted By",value="System (Auto)",inline=true},
         })
     end
@@ -220,8 +220,8 @@ local function generateKey(tier)
     repeat att=att+1; math.randomseed(os.time()+att*math.random(1000)); key=prefix.."-"..rStr(4).."-"..rStr(4).."-"..rStr(4)
     until not keys[key] and not GeneratedKeys[key]
     GeneratedKeys[key]=true
-    local saved=fbPut("/keys/"..key,{tier=tier,status="unused",expiry=0,userId=""})
-    hKeygen("Key Generated","New key generated.",3092790,{
+    local saved=fbPut("/keys/"..key,{tier=tier,status="unused",expiry=0,userId="",totalTime=0,lastLogin=0,loginCount=0})
+    hKeygen("Key Generated","New key created.",3092790,{
         {name="Tier",value=tier,inline=true},{name="Key",value=key,inline=false},
         {name="By",value=modUsername.." ("..tostring(modUserId)..")",inline=true},
     })
@@ -253,9 +253,14 @@ local function validateKey(key,userId,username)
         LocalPlayer:Kick("This key is linked to another account.\nDiscord: "..DISCORD)
         return false,"Key already linked.",nil
     end
-    if data.status~="unused" and tostring(data.userId)==tostring(userId) then return true,"Access granted!",data.tier end
+    if data.status~="unused" and tostring(data.userId)==tostring(userId) then
+        local loginCount=(tonumber(data.loginCount) or 0)+1
+        local totalTime=tonumber(data.totalTime) or 0
+        fbPut("/keys/"..key,{tier=data.tier,status=data.status,expiry=data.expiry,userId=data.userId,totalTime=totalTime,lastLogin=os.time(),loginCount=loginCount})
+        return true,"Access granted!",data.tier
+    end
     local expiry=data.tier=="Lifetime" and 0 or (os.time()+TIER_DUR[data.tier])
-    fbPut("/keys/"..key,{tier=data.tier,status="used",expiry=expiry,userId=tostring(userId)})
+    fbPut("/keys/"..key,{tier=data.tier,status="used",expiry=expiry,userId=tostring(userId),totalTime=0,lastLogin=os.time(),loginCount=1})
     hKeygen("Key Redeemed","User redeemed key.",5763719,{
         {name="Username",value=username.." ("..tostring(userId)..")",inline=true},
         {name="Tier",value=data.tier,inline=true},{name="Key",value=key,inline=false},
@@ -266,7 +271,7 @@ end
 
 local function resetKey(key)
     local data=fbGet("/keys/"..key); if not data then return false,"Key not found." end
-    fbPut("/keys/"..key,{tier=data.tier,status="unused",expiry=0,userId=""}); return true,"Key reset."
+    fbPut("/keys/"..key,{tier=data.tier,status="unused",expiry=0,userId="",totalTime=0,lastLogin=0,loginCount=0}); return true,"Key reset."
 end
 local function deleteKey(key)
     if not fbGet("/keys/"..key) then return false,"Key not found." end
@@ -278,81 +283,73 @@ end
 -- ================================================
 local function blacklistUser(username,reason)
     local safe=username:lower():gsub("[^%w_]","_")
-    fbPut("/blacklist/"..safe,reason or "Blacklisted by moderator")
+    fbPut("/blacklist/"..safe,reason or "Blacklisted by staff")
     local tid=nil; pcall(function() tid=Players:GetUserIdFromNameAsync(username) end)
-    if tid then fbPut("/blacklist/id_"..tostring(tid),reason or "Blacklisted by moderator") end
-    hBlacklist(username,tid or "Unknown",reason or "Blacklisted by moderator",true)
+    if tid then fbPut("/blacklist/id_"..tostring(tid),reason or "Blacklisted by staff") end
+    hBlacklist(username,tid or "Unknown",reason or "Blacklisted by staff",true)
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower()==username:lower() or (tid and p.UserId==tid) then
+            p:Kick("You have been blacklisted.\nReason: "..(reason or "Blacklisted by staff").."\nAppeal at Discord: "..DISCORD)
+        end
+    end
     return true,username.." blacklisted."
 end
 local function unblacklistUser(username)
-    local safe=username:lower():gsub("[^%w_]","_")
-    fbDel("/blacklist/"..safe)
+    local safe=username:lower():gsub("[^%w_]","_"); fbDel("/blacklist/"..safe)
     local tid=nil; pcall(function() tid=Players:GetUserIdFromNameAsync(username) end)
     if tid then fbDel("/blacklist/id_"..tostring(tid)) end
-    sendHook(WEBHOOK_BLACKLIST,"User Unblacklisted","Moderator unblacklisted.",5763719,{
+    sendHook(WEBHOOK_BLACKLIST,"User Unblacklisted","Staff unblacklisted a user.",5763719,{
         {name="User",value=username,inline=true},
-        {name="Moderator",value=modUsername.." ("..tostring(modUserId)..")",inline=true},
+        {name="By",value=modUsername.." ("..tostring(modUserId)..")",inline=true},
     })
     return true,username.." unblacklisted."
 end
 local function addWhitelist(username)
     local safe=username:lower():gsub("[^%w_]","_")
     local saved=fbPut("/whitelist/"..safe,{username=username,addedBy=modUsername,addedAt=os.time()})
-    if saved then
-        hKeygen("User Whitelisted","Admin whitelisted user.",5763719,{
-            {name="User",value=username,inline=true},{name="Added By",value=modUsername,inline=true},
-        })
-        return true,username.." whitelisted!"
-    end
-    return false,"Failed to whitelist."
+    if saved then hKeygen("Whitelisted",username.." whitelisted.",5763719,{{name="By",value=modUsername,inline=true}}); return true,username.." whitelisted!" end
+    return false,"Failed."
 end
 local function removeWhitelist(username)
     local safe=username:lower():gsub("[^%w_]","_"); fbDel("/whitelist/"..safe)
-    hKeygen("Removed from Whitelist","Admin removed whitelist.",16776960,{
-        {name="User",value=username,inline=true},{name="Removed By",value=modUsername,inline=true},
-    })
+    hKeygen("Whitelist Removed",username.." removed.",16776960,{{name="By",value=modUsername,inline=true}})
     return true,username.." removed from whitelist."
 end
 local function checkWhitelist(username)
-    local safe=username:lower():gsub("[^%w_]","_")
-    return fbGet("/whitelist/"..safe)~=nil
+    return fbGet("/whitelist/"..username:lower():gsub("[^%w_]","_"))~=nil
 end
 local function sendAnnouncement(msg)
     local saved=fbPut("/announcement",msg)
-    if saved then
-        hKeygen("Announcement Sent","Admin sent message.",16776960,{
-            {name="Message",value=msg,inline=false},{name="By",value=modUsername,inline=true},
-        })
-        return true,"Sent!"
-    end
+    if saved then hKeygen("Announcement",msg,16776960,{{name="By",value=modUsername,inline=true}}); return true,"Sent!" end
     return false,"Failed."
 end
 local function clearAnnouncement() fbPut("/announcement","") end
 
 -- ================================================
--- KEY POPUP UI
+-- KEY POPUP UI (fires whenever admin generates a key)
 -- ================================================
 local function showKeyPopup(genKey)
     local tier=genKey:sub(1,1)=="W" and "Weekly" or genKey:sub(1,1)=="M" and "Monthly" or "Lifetime"
     local tColor=tier=="Lifetime" and Color3.fromRGB(180,100,255) or tier=="Monthly" and Color3.fromRGB(255,180,50) or Color3.fromRGB(80,180,255)
     local existing=game.CoreGui:FindFirstChild("KeyPopup"); if existing then existing:Destroy() end
     local gui=Instance.new("ScreenGui"); gui.Name="KeyPopup"; gui.ResetOnSpawn=false; gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; gui.Parent=game.CoreGui
-    local bg=Instance.new("Frame",gui); bg.Size=UDim2.new(0,460,0,180); bg.Position=UDim2.new(0.5,-230,0.5,-90); bg.BackgroundColor3=Color3.fromRGB(12,12,18); bg.BorderSizePixel=0; Instance.new("UICorner",bg).CornerRadius=UDim.new(0,14)
+    local bg=Instance.new("Frame",gui); bg.Size=UDim2.new(0,500,0,200); bg.Position=UDim2.new(0.5,-250,0.5,-100); bg.BackgroundColor3=Color3.fromRGB(12,12,18); bg.BorderSizePixel=0; Instance.new("UICorner",bg).CornerRadius=UDim.new(0,14)
     local stroke=Instance.new("UIStroke",bg); stroke.Color=tColor; stroke.Thickness=2
-    local hdr=Instance.new("TextLabel",bg); hdr.Size=UDim2.new(1,0,0,36); hdr.Position=UDim2.new(0,0,0,8); hdr.BackgroundTransparency=1; hdr.Text="Key Generated - "..tier; hdr.TextColor3=tColor; hdr.TextSize=16; hdr.Font=Enum.Font.GothamBold
+    local hdr=Instance.new("TextLabel",bg); hdr.Size=UDim2.new(1,0,0,36); hdr.Position=UDim2.new(0,0,0,8); hdr.BackgroundTransparency=1; hdr.Text="✅ Key Generated — "..tier; hdr.TextColor3=tColor; hdr.TextSize=16; hdr.Font=Enum.Font.GothamBold
     local tierInfo=Instance.new("TextLabel",bg); tierInfo.Size=UDim2.new(1,-20,0,16); tierInfo.Position=UDim2.new(0,10,0,42); tierInfo.BackgroundTransparency=1
-    if tier=="Lifetime" then tierInfo.Text="Never expires" elseif tier=="Monthly" then tierInfo.Text="Expires in 30 days" else tierInfo.Text="Expires in 7 days" end
+    if tier=="Lifetime" then tierInfo.Text="⏳ Never expires" elseif tier=="Monthly" then tierInfo.Text="⏳ Expires in 30 days" else tierInfo.Text="⏳ Expires in 7 days" end
     tierInfo.TextColor3=Color3.fromRGB(160,160,170); tierInfo.TextSize=12; tierInfo.Font=Enum.Font.Gotham
-    local kBox=Instance.new("TextBox",bg); kBox.Size=UDim2.new(1,-80,0,40); kBox.Position=UDim2.new(0,10,0,64); kBox.BackgroundColor3=Color3.fromRGB(20,20,30); kBox.BorderSizePixel=0; kBox.Text=genKey; kBox.TextColor3=Color3.fromRGB(255,255,255); kBox.TextSize=14; kBox.Font=Enum.Font.Code; kBox.ClearTextOnFocus=false; kBox.TextEditable=false; Instance.new("UICorner",kBox).CornerRadius=UDim.new(0,8)
-    local cBtn=Instance.new("TextButton",bg); cBtn.Size=UDim2.new(0,60,0,40); cBtn.Position=UDim2.new(1,-70,0,64); cBtn.BackgroundColor3=tColor; cBtn.BorderSizePixel=0; cBtn.Text="Copy"; cBtn.TextColor3=Color3.fromRGB(255,255,255); cBtn.TextSize=13; cBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",cBtn).CornerRadius=UDim.new(0,8)
-    cBtn.MouseButton1Click:Connect(function() setclipboard(genKey); cBtn.Text="Copied!"; task.wait(1.5); if cBtn and cBtn.Parent then cBtn.Text="Copy" end end)
-    local tBg=Instance.new("Frame",bg); tBg.Size=UDim2.new(1,-20,0,4); tBg.Position=UDim2.new(0,10,1,-12); tBg.BackgroundColor3=Color3.fromRGB(40,40,50); tBg.BorderSizePixel=0; Instance.new("UICorner",tBg).CornerRadius=UDim.new(1,0)
+    local kBox=Instance.new("TextBox",bg); kBox.Size=UDim2.new(1,-90,0,44); kBox.Position=UDim2.new(0,10,0,64); kBox.BackgroundColor3=Color3.fromRGB(20,20,30); kBox.BorderSizePixel=0; kBox.Text=genKey; kBox.TextColor3=Color3.fromRGB(255,255,255); kBox.TextSize=15; kBox.Font=Enum.Font.Code; kBox.ClearTextOnFocus=false; kBox.TextEditable=false; Instance.new("UICorner",kBox).CornerRadius=UDim.new(0,8)
+    local cBtn=Instance.new("TextButton",bg); cBtn.Size=UDim2.new(0,70,0,44); cBtn.Position=UDim2.new(1,-80,0,64); cBtn.BackgroundColor3=tColor; cBtn.BorderSizePixel=0; cBtn.Text="Copy"; cBtn.TextColor3=Color3.fromRGB(255,255,255); cBtn.TextSize=13; cBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",cBtn).CornerRadius=UDim.new(0,8)
+    cBtn.MouseButton1Click:Connect(function() setclipboard(genKey); cBtn.Text="✅ Copied!"; task.wait(1.5); if cBtn and cBtn.Parent then cBtn.Text="Copy" end end)
+    local badge=Instance.new("TextLabel",bg); badge.Size=UDim2.new(0,90,0,22); badge.Position=UDim2.new(0,10,1,-32); badge.BackgroundColor3=tColor; badge.BorderSizePixel=0; badge.Text=tier:upper(); badge.TextColor3=Color3.fromRGB(255,255,255); badge.TextSize=11; badge.Font=Enum.Font.GothamBold; Instance.new("UICorner",badge).CornerRadius=UDim.new(0,6)
+    local tBg=Instance.new("Frame",bg); tBg.Size=UDim2.new(1,-20,0,4); tBg.Position=UDim2.new(0,10,1,-8); tBg.BackgroundColor3=Color3.fromRGB(40,40,50); tBg.BorderSizePixel=0; Instance.new("UICorner",tBg).CornerRadius=UDim.new(1,0)
     local tFill=Instance.new("Frame",tBg); tFill.Size=UDim2.new(1,0,1,0); tFill.BackgroundColor3=tColor; tFill.BorderSizePixel=0; Instance.new("UICorner",tFill).CornerRadius=UDim.new(1,0)
     local elapsed=0; local conn
     conn=RunService.Heartbeat:Connect(function(dt)
         elapsed=elapsed+dt
-        if tFill and tFill.Parent then tFill.Size=UDim2.new(math.max(0,1-(elapsed/12)),0,1,0) end
-        if elapsed>=12 then conn:Disconnect(); if gui and gui.Parent then gui:Destroy() end end
+        if tFill and tFill.Parent then tFill.Size=UDim2.new(math.max(0,1-(elapsed/15)),0,1,0) end
+        if elapsed>=15 then conn:Disconnect(); if gui and gui.Parent then gui:Destroy() end end
     end)
 end
 
@@ -449,18 +446,11 @@ tryAutoExec(function(isAdmin,tier)
     local hideLoopConn=nil
 
     local guiCapture=game:GetService("CoreGui").ChildAdded:Connect(function(child)
-        if child:IsA("ScreenGui") then
-            capturedGuis[child]=true
-            if isAdmin and not menuVisible then child.Enabled=false end
-        end
+        if child:IsA("ScreenGui") then capturedGuis[child]=true; if isAdmin and not menuVisible then child.Enabled=false end end
     end)
 
-    local function hideAllGuis()
-        pcall(function() for gui,_ in pairs(capturedGuis) do if gui and gui.Parent then gui.Enabled=false end end end)
-    end
-    local function showAllGuis()
-        pcall(function() for gui,_ in pairs(capturedGuis) do if gui and gui.Parent then gui.Enabled=true end end end)
-    end
+    local function hideAllGuis() pcall(function() for gui,_ in pairs(capturedGuis) do if gui and gui.Parent then gui.Enabled=false end end end) end
+    local function showAllGuis() pcall(function() for gui,_ in pairs(capturedGuis) do if gui and gui.Parent then gui.Enabled=true end end end) end
     local function toggleAdminMenu()
         menuVisible=not menuVisible
         if menuVisible then showAllGuis(); if hideLoopConn then hideLoopConn:Disconnect(); hideLoopConn=nil end
@@ -534,6 +524,7 @@ tryAutoExec(function(isAdmin,tier)
     -- LIVE KEY VALIDATION LOOP
     -- ================================================
     local lastAnn=""
+    local sessionStart=os.time()
     if not isAdmin then
         task.spawn(function()
             while task.wait(2) do
@@ -551,6 +542,20 @@ tryAutoExec(function(isAdmin,tier)
                         if not kd or (kd.tier~="Lifetime" and kdExpiry~=0 and os.time()>kdExpiry) then
                             featuresLocked=true; clearKey(); Library:Notify("Key expired. Contact admin.",6)
                         end
+                    end
+                end)
+            end
+        end)
+        task.spawn(function()
+            while task.wait(60) do
+                if not accessGranted or not currentUserKey then break end
+                pcall(function()
+                    local kd=fbGet("/keys/"..currentUserKey)
+                    if kd then
+                        local elapsed=os.time()-sessionStart
+                        local totalTime=(tonumber(kd.totalTime) or 0)+elapsed
+                        sessionStart=os.time()
+                        fbPut("/keys/"..currentUserKey,{tier=kd.tier,status=kd.status,expiry=kd.expiry,userId=kd.userId,totalTime=totalTime,lastLogin=kd.lastLogin,loginCount=kd.loginCount})
                     end
                 end)
             end
@@ -573,14 +578,16 @@ tryAutoExec(function(isAdmin,tier)
         local function onGen(t)
             Library:Notify("Generating "..t.." key...",2)
             task.spawn(function()
-                local k,s=generateKey(t); lkLabel:SetText("Last: "..k); showKeyPopup(k)
-                Library:Notify(s and t.." key saved!" or "Failed!",s and 3 or 5)
+                local k,s=generateKey(t)
+                lkLabel:SetText("Last: "..k)
+                showKeyPopup(k)
+                Library:Notify(s and t.." key saved!" or "Firebase error!",s and 3 or 5)
             end)
         end
         AGG:AddButton("[W] Generate Weekly Key",   function() onGen("Weekly")   end)
         AGG:AddButton("[M] Generate Monthly Key",  function() onGen("Monthly")  end)
         AGG:AddButton("[L] Generate Lifetime Key", function() onGen("Lifetime") end)
-        ABG:AddLabel("Blacklist or unblacklist by username."); ABG:AddDivider()
+        ABG:AddLabel("Blacklist or unblacklist users."); ABG:AddDivider()
         local blUser=""
         ABG:AddInput("BlacklistInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) blUser=v end})
         ABG:AddButton("Blacklist User",function()
@@ -597,7 +604,7 @@ tryAutoExec(function(isAdmin,tier)
             local cnBtn=Instance.new("TextButton",pop); cnBtn.Size=UDim2.new(0.47,0,0,34); cnBtn.Position=UDim2.new(0.53,-16,1,-44); cnBtn.BackgroundColor3=Color3.fromRGB(40,40,60); cnBtn.BorderSizePixel=0; cnBtn.Text="Cancel"; cnBtn.TextColor3=Color3.fromRGB(200,200,200); cnBtn.TextSize=13; cnBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",cnBtn).CornerRadius=UDim.new(0,8)
             cnBtn.MouseButton1Click:Connect(function() rGui:Destroy() end)
             cfBtn.MouseButton1Click:Connect(function()
-                local reason=rIn.Text; if reason=="" then reason="Blacklisted by moderator" end
+                local reason=rIn.Text; if reason=="" then reason="Blacklisted by staff" end
                 cfBtn.Text="Saving..."; stLbl.Text="Blacklisting "..name.."..."
                 task.spawn(function()
                     local ok,msg=blacklistUser(name,reason)
@@ -611,39 +618,40 @@ tryAutoExec(function(isAdmin,tier)
             local name=blUser
             task.spawn(function() local ok,msg=unblacklistUser(name); Library:Notify(msg,ok and 3 or 5); if ok then blUser=""; Options.BlacklistInput:SetValue("") end end)
         end)
-        ALG:AddLabel("Type username to find their key."); ALG:AddDivider()
+        ALG:AddLabel("Lookup key by username."); ALG:AddDivider()
         local lookUser=""
         ALG:AddInput("LookupInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) lookUser=v end})
-        local lk1=ALG:AddLabel("Key: -"); local lk2=ALG:AddLabel(""); local lkT=ALG:AddLabel("Tier: -"); local lkS=ALG:AddLabel("Status: -"); local lkE=ALG:AddLabel("Expires: -"); local lfk=""
+        local lk1=ALG:AddLabel("Key: -"); local lk2=ALG:AddLabel(""); local lkT=ALG:AddLabel("Tier: -"); local lkS=ALG:AddLabel("Status: -"); local lkE=ALG:AddLabel("Expires: -")
+        local lkLogins=ALG:AddLabel("Logins: -"); local lkTime=ALG:AddLabel("Total Time: -"); local lfk=""
         ALG:AddButton("Lookup by Username",function()
             if lookUser=="" then Library:Notify("Enter a username.",3) return end
-            Library:Notify("Searching for "..lookUser.."...",2)
             task.spawn(function()
                 local tid=nil; local ok=pcall(function() tid=Players:GetUserIdFromNameAsync(lookUser) end)
-                if not ok or not tid then Library:Notify("User not found: "..lookUser,4); lk1:SetText("Key: Not found"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -"); lfk=""; return end
-                local keys=fbGet("/keys")
-                if not keys then Library:Notify("Firebase unreachable.",4); lk1:SetText("Key: DB error"); lk2:SetText(""); lfk=""; return end
+                if not ok or not tid then Library:Notify("User not found.",4); return end
+                local keys=fbGet("/keys"); if not keys then Library:Notify("Firebase error.",4); return end
                 local fk,fd=nil,nil
-                for k,d in pairs(keys) do if tostring(d.userId)==tostring(tid) or tonumber(d.userId)==tid then fk=k; fd=d; break end end
-                if not fk then Library:Notify("No key for "..lookUser,3); lk1:SetText("Key: Not found"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -"); lfk=""; return end
+                for k,d in pairs(keys) do if tostring(d.userId)==tostring(tid) then fk=k; fd=d; break end end
+                if not fk then Library:Notify("No key found.",3); lk1:SetText("Key: -"); return end
                 lfk=fk; local half=math.ceil(#fk/2)
                 lk1:SetText("Key: "..fk:sub(1,half)); lk2:SetText(fk:sub(half+1)); lkT:SetText("Tier: "..tostring(fd.tier)); lkS:SetText("Status: "..tostring(fd.status))
-                local expiry=tonumber(fd.expiry) or 0; local es
-                if fd.tier=="Lifetime" or expiry==0 then es="Never (Lifetime)"
-                else local secs=math.max(0,expiry-os.time()); if secs==0 then es="EXPIRED" else es=math.floor(secs/86400).."d "..math.floor((secs%86400)/3600).."h "..math.floor((secs%3600)/60).."m" end end
-                lkE:SetText("Expires: "..es); Library:Notify("Found key for "..lookUser.."!",3)
+                local expiry=tonumber(fd.expiry) or 0
+                if fd.tier=="Lifetime" or expiry==0 then lkE:SetText("Expires: Never")
+                else local secs=math.max(0,expiry-os.time()); lkE:SetText("Expires: "..math.floor(secs/86400).."d "..math.floor((secs%86400)/3600).."h") end
+                lkLogins:SetText("Logins: "..tostring(tonumber(fd.loginCount) or 0))
+                local ts=tonumber(fd.totalTime) or 0; lkTime:SetText("Total: "..math.floor(ts/3600).."h "..math.floor((ts%3600)/60).."m")
+                Library:Notify("Found!",3)
             end)
         end)
-        ALG:AddButton("Copy Found Key",function() if lfk=="" then Library:Notify("Look up first.",3) return end; setclipboard(lfk); Library:Notify("Copied!",3) end)
+        ALG:AddButton("Copy Found Key",function() if lfk~="" then setclipboard(lfk); Library:Notify("Copied!",3) end end)
         ALG:AddButton("Reset Found Key",function()
-            if lfk=="" then Library:Notify("Look up first.",3) return end
-            task.spawn(function() local ok,msg=resetKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end end)
+            if lfk=="" then return end
+            task.spawn(function() local ok,msg=resetKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText("") end end)
         end)
         ALG:AddButton("Delete Found Key",function()
-            if lfk=="" then Library:Notify("Look up first.",3) return end
-            task.spawn(function() local ok,msg=deleteKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText(""); lkT:SetText("Tier: -"); lkS:SetText("Status: -"); lkE:SetText("Expires: -") end end)
+            if lfk=="" then return end
+            task.spawn(function() local ok,msg=deleteKey(lfk); Library:Notify(msg,3); if ok then lfk=""; lk1:SetText("Key: -"); lk2:SetText("") end end)
         end)
-        AAG:AddLabel("Message shown to all users."); AAG:AddDivider()
+        AAG:AddLabel("Broadcast to all users."); AAG:AddDivider()
         local annMsg=""
         AAG:AddInput("AnnounceInput",{Default="",Numeric=false,Finished=false,Text="Message",Placeholder="Type announcement...",Callback=function(v) annMsg=v end})
         AAG:AddButton("Send Announcement",function()
@@ -654,24 +662,24 @@ tryAutoExec(function(isAdmin,tier)
         local updMsg=""
         AAG:AddInput("UpdateInput",{Default="",Numeric=false,Finished=false,Text="Update Notes",Placeholder="What changed...",Callback=function(v) updMsg=v end})
         AAG:AddButton("Log Script Update",function()
-            if updMsg=="" then Library:Notify("Enter description.",3) return end
-            hUpdate("Script Updated v"..CURRENT_VERSION,"By: "..modUsername.."\nChanges: "..updMsg)
-            Library:Notify("Update logged!",3); updMsg=""; Options.UpdateInput:SetValue("")
+            if updMsg=="" then return end
+            hUpdate("Script Updated v"..CURRENT_VERSION,"By: "..modUsername.."\n"..updMsg)
+            Library:Notify("Logged!",3); updMsg=""; Options.UpdateInput:SetValue("")
         end)
-        AWG:AddLabel("Whitelisted users get full admin access."); AWG:AddDivider()
+        AWG:AddLabel("Whitelist management."); AWG:AddDivider()
         local wlUser=""
         AWG:AddInput("WhitelistInput",{Default="",Numeric=false,Finished=false,Text="Username",Placeholder="Enter username...",Callback=function(v) wlUser=v end})
         AWG:AddButton("Add to Whitelist",function()
-            if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser; task.spawn(function() local ok,msg=addWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
+            if wlUser=="" then return end
+            local name=wlUser; task.spawn(function() local ok,msg=addWhitelist(name); Library:Notify(msg,ok and 3 or 5) end)
         end)
         AWG:AddButton("Remove from Whitelist",function()
-            if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser; task.spawn(function() local ok,msg=removeWhitelist(name); Library:Notify(msg,ok and 3 or 5); if ok then wlUser=""; Options.WhitelistInput:SetValue("") end end)
+            if wlUser=="" then return end
+            local name=wlUser; task.spawn(function() local ok,msg=removeWhitelist(name); Library:Notify(msg,ok and 3 or 5) end)
         end)
         AWG:AddButton("Check if Whitelisted",function()
-            if wlUser=="" then Library:Notify("Enter a username.",3) return end
-            local name=wlUser; task.spawn(function() local isWL=checkWhitelist(name); Library:Notify(name..(isWL and " IS whitelisted." or " is NOT whitelisted."),3) end)
+            if wlUser=="" then return end
+            local name=wlUser; task.spawn(function() Library:Notify(name..(checkWhitelist(name) and " IS whitelisted." or " NOT whitelisted."),3) end)
         end)
         AWG:AddDivider()
         local wlListLabel=AWG:AddLabel("Press refresh to load.")
@@ -680,7 +688,6 @@ tryAutoExec(function(isAdmin,tier)
                 local wl=fbGet("/whitelist") or {}; local count=0; local lines={}
                 for u,d in pairs(wl) do count=count+1; local ab=type(d)=="table" and (d.addedBy or "?") or "?"; lines[#lines+1]=u.." (by "..ab..")" end
                 wlListLabel:SetText(count==0 and "No whitelisted users." or count.." users:\n"..table.concat(lines,"\n"))
-                Library:Notify("Loaded "..count.." users.",3)
             end)
         end)
         local bllLabel=ABLG:AddLabel("Press refresh to load."); ABLG:AddDivider()
@@ -688,8 +695,7 @@ tryAutoExec(function(isAdmin,tier)
             task.spawn(function()
                 local bl=fbGet("/blacklist") or {}; local count=0; local lines={}
                 for u,r in pairs(bl) do if u:sub(1,3)~="id_" then count=count+1; lines[#lines+1]=u.." - "..tostring(r) end end
-                bllLabel:SetText(count==0 and "No blacklisted users." or count.." users:\n"..table.concat(lines,"\n"))
-                Library:Notify("Loaded "..count.." users.",3)
+                bllLabel:SetText(count==0 and "None." or count.." users:\n"..table.concat(lines,"\n"))
             end)
         end)
     end
@@ -724,13 +730,13 @@ tryAutoExec(function(isAdmin,tier)
         return closest
     end
 
-    local AimbotMainGroupBox=Tabs.Aimbot:AddLeftGroupbox("Aimbot Main Settings")
+    local AimbotMainGroupBox=Tabs.Aimbot:AddLeftGroupbox("Aimbot Settings")
     local AimbotFOVGroupBox=Tabs.Aimbot:AddRightGroupbox("FOV Settings")
     local aimbotEnabled=false; local aimbotMode="Rage"; local aimbotLock="Head"
     local aimbotAutoFire=false; local aimbotPrediction=false; local aimbotSensitivity=1
     AimbotMainGroupBox:AddToggle("AimbotToggle",{Text="Enable Aimbot",Default=false,Callback=function(v) if featuresLocked then Toggles.AimbotToggle:SetValue(false) return end; aimbotEnabled=v end})
     AimbotMainGroupBox:AddLabel("Aimbot Keybind"):AddKeyPicker("AimbotKeybind",{Default="MB2",Mode="Hold",Text="Aimbot Key",NoUI=false,SyncToggleState=false,Callback=function(v) if featuresLocked then return end; aimbotEnabled=v end})
-    AimbotMainGroupBox:AddDropdown("AimbotMode",{Values={"Rage","Legit"},Default=1,Multi=false,Text="Aimbot Mode",Callback=function(v) aimbotMode=v end})
+    AimbotMainGroupBox:AddDropdown("AimbotMode",{Values={"Rage","Legit"},Default=1,Multi=false,Text="Mode",Callback=function(v) aimbotMode=v end})
     AimbotMainGroupBox:AddDropdown("AimbotLock",{Values={"Head","Torso"},Default=1,Multi=false,Text="Lock Target",Callback=function(v) aimbotLock=v end})
     AimbotMainGroupBox:AddToggle("AimbotAutoFire",{Text="Auto-Fire",Default=false,Callback=function(v) if featuresLocked then Toggles.AimbotAutoFire:SetValue(false) return end; aimbotAutoFire=v end})
     AimbotMainGroupBox:AddToggle("AimbotPrediction",{Text="Movement Prediction",Default=false,Callback=function(v) if featuresLocked then Toggles.AimbotPrediction:SetValue(false) return end; aimbotPrediction=v end})
@@ -740,36 +746,22 @@ tryAutoExec(function(isAdmin,tier)
     AimbotMainGroupBox:AddToggle("AimDeadCheck",{Text="Dead Check",Default=true,Callback=function(v) aimDeadCheck=v end})
     AimbotMainGroupBox:AddToggle("AimWallCheck",{Text="Wall Check",Default=true,Callback=function(v) aimWallCheck=v end})
     AimbotFOVGroupBox:AddSlider("AimFOV",{Text="Aimbot FOV",Default=500,Min=100,Max=1000,Rounding=0,Callback=function(v) aimFOV=v end})
-
     local silentAimEnabled=false; local silentAimHitchance=50; local silentAimTarget="Head"
     AimbotFOVGroupBox:AddToggle("SilentAimToggle",{Text="Silent Aim",Default=false,Callback=function(v) if featuresLocked then Toggles.SilentAimToggle:SetValue(false) return end; silentAimEnabled=v end})
     AimbotFOVGroupBox:AddSlider("SilentAimHitchance",{Text="Hitchance",Default=50,Min=0,Max=100,Rounding=0,Suffix="%",Callback=function(v) silentAimHitchance=v end})
     AimbotFOVGroupBox:AddDropdown("SilentAimTarget",{Values={"Head","Body","Head & Body"},Default=1,Multi=false,Text="Silent Aim Target",Callback=function(v) silentAimTarget=v end})
-
     local fovCircleEnabled=false; local fovCircleSize=100; local fovCircleRainbow=false
     local fovCircle=Drawing.new("Circle"); fovCircle.Visible=false; fovCircle.Thickness=2; fovCircle.Color=Color3.new(1,1,1); fovCircle.Transparency=1; fovCircle.NumSides=64
     AimbotFOVGroupBox:AddToggle("FOVCircleToggle",{Text="FOV Circle",Default=false,Callback=function(v) if featuresLocked then Toggles.FOVCircleToggle:SetValue(false) return end; fovCircleEnabled=v; fovCircle.Visible=v end})
     AimbotFOVGroupBox:AddSlider("FOVCircleSize",{Text="FOV Circle Size",Default=100,Min=50,Max=500,Rounding=0,Suffix=" px",Callback=function(v) fovCircleSize=v end})
     AimbotFOVGroupBox:AddToggle("FOVCircleRainbow",{Text="Rainbow FOV",Default=false,Callback=function(v) fovCircleRainbow=v end})
     AimbotFOVGroupBox:AddDivider()
-
     local fovExtEnabled=false; local fovExtValue=120
     if isLifetime then
-        AimbotFOVGroupBox:AddToggle("FOVExtendToggle",{Text="[L] FOV Extender",Default=false,Callback=function(v)
-            fovExtEnabled=v
-            if not v then pcall(function() Camera.FieldOfView=70 end)
-            else pcall(function() Camera.FieldOfView=fovExtValue end) end
-        end})
-        AimbotFOVGroupBox:AddSlider("FOVExtendSlider",{Text="Extended FOV",Default=120,Min=70,Max=179,Rounding=0,Suffix=" deg",Callback=function(v)
-            fovExtValue=v; if fovExtEnabled then pcall(function() Camera.FieldOfView=v end) end
-        end})
-        connections["FOVExtend"]=RunService.RenderStepped:Connect(function()
-            if not featuresLocked and fovExtEnabled then
-                pcall(function() if Camera.FieldOfView~=fovExtValue then Camera.FieldOfView=fovExtValue end end)
-            end
-        end)
+        AimbotFOVGroupBox:AddToggle("FOVExtendToggle",{Text="[L] FOV Extender",Default=false,Callback=function(v) fovExtEnabled=v; if not v then pcall(function() Camera.FieldOfView=70 end) else pcall(function() Camera.FieldOfView=fovExtValue end) end end})
+        AimbotFOVGroupBox:AddSlider("FOVExtendSlider",{Text="Extended FOV",Default=120,Min=70,Max=179,Rounding=0,Suffix=" deg",Callback=function(v) fovExtValue=v; if fovExtEnabled then pcall(function() Camera.FieldOfView=v end) end end})
+        connections["FOVExtend"]=RunService.RenderStepped:Connect(function() if not featuresLocked and fovExtEnabled then pcall(function() if Camera.FieldOfView~=fovExtValue then Camera.FieldOfView=fovExtValue end end) end end)
     else AimbotFOVGroupBox:AddLabel("[L] FOV Extender - Lifetime Only") end
-
     RunService:BindToRenderStep("Aimbot",Enum.RenderPriority.Camera.Value,function(dt)
         if featuresLocked or not aimbotEnabled then return end
         local closest=getClosestPlayer(aimFOV)
@@ -785,7 +777,6 @@ tryAutoExec(function(isAdmin,tier)
             if aimbotAutoFire then local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool"); if tool then tool:Activate() end end
         end
     end)
-
     pcall(function()
         local utility=require(ReplicatedStorage.Modules.Utility); local oldRaycast=utility.Raycast
         utility.Raycast=function(...)
@@ -796,17 +787,13 @@ tryAutoExec(function(isAdmin,tier)
                     local tp=nil
                     if silentAimTarget=="Head" then tp=closest.Character:FindFirstChild("Head")
                     elseif silentAimTarget=="Body" then tp=closest.Character:FindFirstChild("UpperTorso") or closest.Character:FindFirstChild("HumanoidRootPart")
-                    elseif silentAimTarget=="Head & Body" then
-                        if math.random(2)==1 then tp=closest.Character:FindFirstChild("Head")
-                        else tp=closest.Character:FindFirstChild("UpperTorso") end
-                    end
+                    elseif silentAimTarget=="Head & Body" then tp=math.random(2)==1 and closest.Character:FindFirstChild("Head") or closest.Character:FindFirstChild("UpperTorso") end
                     if tp then args[3]=tp.Position end
                 end
             end
             return oldRaycast(table.unpack(args))
         end
     end)
-
     connections["FOVCircle"]=RunService.RenderStepped:Connect(function()
         if not featuresLocked and fovCircleEnabled then
             fovCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2); fovCircle.Radius=fovCircleSize; fovCircle.Visible=true
@@ -817,15 +804,14 @@ tryAutoExec(function(isAdmin,tier)
     -- ================================================
     -- ESP LOGIC
     -- ================================================
-    local VisualsLeftGroupBox=Tabs.Visuals:AddLeftGroupbox("Player ESP Options")
+    local VisualsLeftGroupBox=Tabs.Visuals:AddLeftGroupbox("Player ESP")
     local VisualsSkeletonGroupBox=Tabs.Visuals:AddRightGroupbox("Skeleton & Overlays")
     local VisualsOtherGroupBox=Tabs.Visuals:AddLeftGroupbox("Other Visuals")
     local playerESPEnabled=false; local boxESPEnabled=false; local chamsESPEnabled=false
     local playerESPName=true; local playerESPDistance=true; local playerESPHealth=true; local playerESPWeapon=true
     local rainbowModeEnabled=false; local deadESPEnabled=true
     local espStates={Box=false,Chams=false,Name=true,Distance=true,Health=true,Weapon=true,Skeleton=false,Tracers=false}
-    local espBoxes={}; local espChams={}; local espTexts={}; local skeletonLines={}
-    local tracerLines={}; local hBars3D={}; local hBars2D={}
+    local espBoxes={}; local espChams={}; local espTexts={}; local skeletonLines={}; local tracerLines={}; local hBars3D={}; local hBars2D={}
     local function cleanupPlayerESP(player)
         if espBoxes[player] then pcall(function() espBoxes[player]:Remove() end); espBoxes[player]=nil end
         if espChams[player] then pcall(function() espChams[player]:Destroy() end); espChams[player]=nil end
@@ -861,24 +847,22 @@ tryAutoExec(function(isAdmin,tier)
         Toggles.BoxESPToggle:SetValue(boxESPEnabled); Toggles.ChamsESPToggle:SetValue(chamsESPEnabled)
         Toggles.SkeletonESPToggle:SetValue(skeletonESPEnabled); Toggles.SkeletonESPTracers:SetValue(skeletonESPTracers)
     end
-    VisualsLeftGroupBox:AddLabel("ESP Master Keybind"):AddKeyPicker("ESPKeybind",{Default="P",Mode="Toggle",Text="ESP Master Key",NoUI=false,Callback=function(v) toggleESPState() end})
+    VisualsLeftGroupBox:AddLabel("ESP Master Keybind"):AddKeyPicker("ESPKeybind",{Default="P",Mode="Toggle",Text="ESP Key",NoUI=false,Callback=function(v) toggleESPState() end})
     VisualsLeftGroupBox:AddToggle("PlayerESPToggle",{Text="Enable Player ESP",Default=false,Callback=function(v) if featuresLocked then Toggles.PlayerESPToggle:SetValue(false) return end; playerESPEnabled=v end})
     VisualsLeftGroupBox:AddToggle("BoxESPToggle",{Text="Box ESP",Default=false,Callback=function(v) if featuresLocked then Toggles.BoxESPToggle:SetValue(false) return end; boxESPEnabled=v; espStates.Box=v end})
     VisualsLeftGroupBox:AddToggle("ChamsESPToggle",{Text="Chams ESP",Default=false,Callback=function(v) if featuresLocked then Toggles.ChamsESPToggle:SetValue(false) return end; chamsESPEnabled=v; espStates.Chams=v end})
     VisualsLeftGroupBox:AddToggle("PlayerESPName",{Text="Name",Default=true,Callback=function(v) playerESPName=v; espStates.Name=v end})
     VisualsLeftGroupBox:AddToggle("PlayerESPDistance",{Text="Distance",Default=true,Callback=function(v) playerESPDistance=v; espStates.Distance=v end})
     VisualsLeftGroupBox:AddToggle("PlayerESPHealth",{Text="Health",Default=true,Callback=function(v) playerESPHealth=v; espStates.Health=v end})
-    VisualsLeftGroupBox:AddToggle("PlayerESPWeapon",{Text="Equipped Weapon",Default=true,Callback=function(v) playerESPWeapon=v; espStates.Weapon=v end})
+    VisualsLeftGroupBox:AddToggle("PlayerESPWeapon",{Text="Weapon",Default=true,Callback=function(v) playerESPWeapon=v; espStates.Weapon=v end})
     VisualsLeftGroupBox:AddDivider()
-
     local lowHPGui=Instance.new("ScreenGui"); lowHPGui.Name="RivalsLowHP"; lowHPGui.ResetOnSpawn=false; lowHPGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; lowHPGui.Parent=game.CoreGui
     local lowHPEnabled=false; local lowHPThresh=30
     local lowHPFrame=Instance.new("Frame",lowHPGui); lowHPFrame.Size=UDim2.new(1,0,1,0); lowHPFrame.BackgroundColor3=Color3.fromRGB(255,0,0); lowHPFrame.BackgroundTransparency=1; lowHPFrame.BorderSizePixel=0; lowHPFrame.Visible=false
-    local lowHPLbl=Instance.new("TextLabel",lowHPFrame); lowHPLbl.Size=UDim2.new(1,0,0,40); lowHPLbl.Position=UDim2.new(0,0,0.5,-20); lowHPLbl.BackgroundTransparency=1; lowHPLbl.Text="ENEMY LOW HP!"; lowHPLbl.TextColor3=Color3.fromRGB(255,60,60); lowHPLbl.TextSize=28; lowHPLbl.Font=Enum.Font.GothamBold
+    Instance.new("TextLabel",lowHPFrame).Size=UDim2.new(1,0,0,40); local lowHPLbl=lowHPFrame:FindFirstChildOfClass("TextLabel"); if lowHPLbl then lowHPLbl.Position=UDim2.new(0,0,0.5,-20); lowHPLbl.BackgroundTransparency=1; lowHPLbl.Text="ENEMY LOW HP!"; lowHPLbl.TextColor3=Color3.fromRGB(255,60,60); lowHPLbl.TextSize=28; lowHPLbl.Font=Enum.Font.GothamBold end
     VisualsLeftGroupBox:AddToggle("LowHPAlertToggle",{Text="Low HP Alert",Default=false,Callback=function(v) lowHPEnabled=v; if not v then lowHPFrame.Visible=false end end})
     VisualsLeftGroupBox:AddSlider("LowHPThreshold",{Text="Low HP Threshold",Default=30,Min=5,Max=80,Rounding=0,Suffix="%",Callback=function(v) lowHPThresh=v end})
     VisualsLeftGroupBox:AddDivider()
-
     local hBar3DEnabled=false; local tracerEnabled=false; local hBar2DEnabled=false
     if isLifetime then
         VisualsLeftGroupBox:AddToggle("HealthBar3DToggle",{Text="[L] 3D Health Bars",Default=false,Callback=function(v) if featuresLocked then Toggles.HealthBar3DToggle:SetValue(false) return end; hBar3DEnabled=v end})
@@ -889,7 +873,6 @@ tryAutoExec(function(isAdmin,tier)
         VisualsLeftGroupBox:AddLabel("[L] Player Tracers - Lifetime Only")
         VisualsLeftGroupBox:AddLabel("[L] 2D Health Bars - Lifetime Only")
     end
-
     local function setupPlayerESP(player)
         if player==LocalPlayer then return end
         player.CharacterAdded:Connect(function() task.wait(0.1); if playerESPEnabled then createPlayerESP(player) end end)
@@ -898,7 +881,6 @@ tryAutoExec(function(isAdmin,tier)
     end
     for _,p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
     Players.PlayerAdded:Connect(setupPlayerESP); Players.PlayerRemoving:Connect(cleanupPlayerESP)
-
     local lowHPFlash=0
     connections["LowHPAlert"]=RunService.Heartbeat:Connect(function(dt)
         if not lowHPEnabled or featuresLocked then lowHPFrame.Visible=false; return end
@@ -911,7 +893,6 @@ tryAutoExec(function(isAdmin,tier)
         if anyLow then lowHPFlash=lowHPFlash+dt*4; lowHPFrame.BackgroundTransparency=0.85+math.sin(lowHPFlash)*0.14; lowHPFrame.Visible=true
         else lowHPFrame.Visible=false; lowHPFlash=0 end
     end)
-
     connections["PlayerESP"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not playerESPEnabled then return end
         local rainbowColor=Color3.fromHSV(tick()%5/5,1,1)
@@ -968,7 +949,6 @@ tryAutoExec(function(isAdmin,tier)
             elseif espChams[player] then espChams[player].Enabled=false end
         end
     end)
-
     connections["HealthBar2D"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not isLifetime or not hBar2DEnabled then for _,d in pairs(hBars2D) do pcall(function() d.outline.Visible=false; d.bg.Visible=false; d.fill.Visible=false; d.text.Visible=false end) end; return end
         local sw=Camera.ViewportSize.X; local sh=Camera.ViewportSize.Y; local bw=6; local bmh=80; local bsp=14
@@ -993,7 +973,6 @@ tryAutoExec(function(isAdmin,tier)
             d.text.Text=p.Name.."\n"..math.floor(hp).."/"..math.floor(mhp); d.text.Position=Vector2.new(xPos-4,yPos+bmh/2-10); d.text.Visible=true
         end
     end)
-
     VisualsSkeletonGroupBox:AddToggle("SkeletonESPToggle",{Text="Skeleton ESP",Default=false,Callback=function(v) if featuresLocked then Toggles.SkeletonESPToggle:SetValue(false) return end; skeletonESPEnabled=v; espStates.Skeleton=v end})
     VisualsSkeletonGroupBox:AddToggle("SkeletonESPTracers",{Text="Tracers",Default=false,Callback=function(v) if featuresLocked then Toggles.SkeletonESPTracers:SetValue(false) return end; skeletonESPTracers=v; espStates.Tracers=v end})
     local specGui=Instance.new("ScreenGui"); specGui.Name="RivalsSpec"; specGui.ResetOnSpawn=false; specGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; specGui.Parent=game.CoreGui
@@ -1059,7 +1038,7 @@ tryAutoExec(function(isAdmin,tier)
         if specEnabled then
             for _,child in pairs(specScroll:GetChildren()) do if child:IsA("TextLabel") then child:Destroy() end end
             if #curSpecs==0 then local lb=Instance.new("TextLabel",specScroll); lb.Size=UDim2.new(1,0,0,18); lb.BackgroundTransparency=1; lb.Text="None"; lb.TextColor3=Color3.fromRGB(120,120,140); lb.TextSize=11; lb.Font=Enum.Font.Gotham; lb.TextXAlignment=Enum.TextXAlignment.Left
-            else for i,name in ipairs(curSpecs) do local lb=Instance.new("TextLabel",specScroll); lb.Size=UDim2.new(1,0,0,18); lb.LayoutOrder=i; lb.BackgroundTransparency=1; lb.Text="Watching: "..name; lb.TextColor3=Color3.fromRGB(255,120,120); lb.TextSize=11; lb.Font=Enum.Font.GothamBold; lb.TextXAlignment=Enum.TextXAlignment.Left end end
+            else for i,name in ipairs(curSpecs) do local lb=Instance.new("TextLabel",specScroll); lb.Size=UDim2.new(1,0,0,18); lb.LayoutOrder=i; lb.BackgroundTransparency=1; lb.Text="👁 "..name; lb.TextColor3=Color3.fromRGB(255,120,120); lb.TextSize=11; lb.Font=Enum.Font.GothamBold; lb.TextXAlignment=Enum.TextXAlignment.Left end end
         end
         if antiSpecEnabled then local bs=#curSpecs>0; if bs and not wasSpec then Library:Notify("Being spectated by: "..table.concat(curSpecs,", "),5) end; wasSpec=bs end
     end)
@@ -1096,10 +1075,7 @@ tryAutoExec(function(isAdmin,tier)
         if v then startFly() else stopFly() end
     end})
 
-    -- ================================================
-    -- FLY LOOP — FIXED FOR MOBILE
-    -- MoveDirection on mobile is world-space already, don't re-apply camera vectors
-    -- ================================================
+    -- FIXED FLY: PC keyboard + mobile thumbstick via MoveDirection
     connections["Fly"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not flyEnabled then return end
         local root=getRoot(); local hum=getHumanoid()
@@ -1108,28 +1084,24 @@ tryAutoExec(function(isAdmin,tier)
         if hum then hum.PlatformStand=true end
         local cf=Camera.CFrame
         local moveDir=Vector3.zero
-
-        -- Keyboard (PC)
+        -- PC keyboard input
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir=moveDir+cf.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir=moveDir-cf.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir=moveDir-cf.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir=moveDir+cf.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir=moveDir+Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir=moveDir-Vector3.new(0,1,0) end
-
-        -- Mobile thumbstick — MoveDirection is already world-space, use directly
-        if hum and hum.MoveDirection.Magnitude > 0 then
-            local md = hum.MoveDirection
-            local hMag = Vector3.new(md.X, 0, md.Z).Magnitude
-            local camLook = cf.LookVector
-            -- X/Z come from joystick world-space, Y from camera pitch so looking up tilts flight up
-            moveDir = moveDir + Vector3.new(md.X, camLook.Y * hMag, md.Z)
+        -- Mobile: read thumbstick via Humanoid.MoveDirection
+        if hum and hum.MoveDirection.Magnitude>0 then
+            local md=hum.MoveDirection
+            local camFlat=Vector3.new(cf.LookVector.X,0,cf.LookVector.Z)
+            local camRight=Vector3.new(cf.RightVector.X,0,cf.RightVector.Z)
+            if camFlat.Magnitude>0 then camFlat=camFlat.Unit end
+            if camRight.Magnitude>0 then camRight=camRight.Unit end
+            moveDir=moveDir+(camFlat*(-md.Z)+camRight*md.X)
         end
-
-        -- Gamepad jump/descend
         if UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then moveDir=moveDir+Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.ButtonB) then moveDir=moveDir-Vector3.new(0,1,0) end
-
         if moveDir.Magnitude>0 then flyBV.Velocity=moveDir.Unit*flySpeed else flyBV.Velocity=Vector3.zero end
         if flyBG and flyBG.Parent then flyBG.CFrame=CFrame.new(root.Position,root.Position+cf.LookVector) end
     end)
@@ -1177,6 +1149,7 @@ tryAutoExec(function(isAdmin,tier)
     -- PROTECTION LOGIC
     -- ================================================
     local ProtectionLeftGroupBox=Tabs.Protection:AddLeftGroupbox("Protection Options")
+    local ProtectionRightGroupBox=Tabs.Protection:AddRightGroupbox("Name Hider")
     local antiAimEnabled=false; local antiAimMode="Spin"; local antiAimSpeed=10
     ProtectionLeftGroupBox:AddToggle("AntiAimToggle",{Text="Anti-Aim",Default=false,Callback=function(v) if featuresLocked then Toggles.AntiAimToggle:SetValue(false) return end; antiAimEnabled=v end})
     ProtectionLeftGroupBox:AddDropdown("AntiAimMode",{Values={"Spin","Jitter","Random"},Default=1,Multi=false,Text="Mode",Callback=function(v) antiAimMode=v end})
@@ -1187,86 +1160,6 @@ tryAutoExec(function(isAdmin,tier)
         if v then originalCameraType=LocalPlayer.CameraMode; originalMaxZoom=LocalPlayer.CameraMaxZoomDistance; originalMinZoom=LocalPlayer.CameraMinZoomDistance; LocalPlayer.CameraMode=Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance=50; LocalPlayer.CameraMinZoomDistance=5
         else LocalPlayer.CameraMode=originalCameraType or Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance=originalMaxZoom or 128; LocalPlayer.CameraMinZoomDistance=originalMinZoom or 0.5 end
     end})
-
-    -- ================================================
-    -- NAME CHANGER — added to Protection tab
-    -- ================================================
-    local nameChangerEnabled = false
-    local customNameValue = ""
-    local nameAdj = {"Shadow","Demon","Ghost","Void","Crimson","Silent","Phantom","Neon","Toxic","Reaper","Dark","Frost","Blaze","Curse","Wraith","Stealth"}
-    local nameNoun = {"Reaper","Slayer","Hunter","Blade","Strike","Phantom","Zero","Apex","Storm","Entity","Shade","Specter","Death","Aura","Viper","Havoc"}
-
-    local function generateRandomName()
-        math.randomseed(os.time()+math.random(9999))
-        return nameAdj[math.random(1,#nameAdj)]..nameNoun[math.random(1,#nameNoun)]..tostring(math.random(10,99))
-    end
-
-    local function applyNameChange(name)
-        pcall(function()
-            local char=getCharacter(); if not char then return end
-            local hum=char:FindFirstChild("Humanoid")
-            if hum then hum.DisplayName=name end
-            local head=char:FindFirstChild("Head")
-            if head then
-                for _,gui in pairs(head:GetChildren()) do
-                    if gui:IsA("BillboardGui") then
-                        for _,child in pairs(gui:GetDescendants()) do
-                            if child:IsA("TextLabel") then child.Text=name end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function restoreOriginalName()
-        pcall(function()
-            local char=getCharacter(); if not char then return end
-            local hum=char:FindFirstChild("Humanoid")
-            if hum then hum.DisplayName=LocalPlayer.DisplayName end
-            local head=char:FindFirstChild("Head")
-            if head then
-                for _,gui in pairs(head:GetChildren()) do
-                    if gui:IsA("BillboardGui") then
-                        for _,child in pairs(gui:GetDescendants()) do
-                            if child:IsA("TextLabel") then child.Text=LocalPlayer.DisplayName end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    ProtectionLeftGroupBox:AddDivider()
-    ProtectionLeftGroupBox:AddLabel("Name Changer (client-side)")
-    ProtectionLeftGroupBox:AddToggle("NameChangerToggle",{Text="Enable Name Changer",Default=false,Callback=function(v)
-        if featuresLocked then Toggles.NameChangerToggle:SetValue(false) return end
-        nameChangerEnabled=v
-        if not v then restoreOriginalName() end
-    end})
-    ProtectionLeftGroupBox:AddInput("CustomNameInput",{Default="",Numeric=false,Finished=false,Text="Custom Name",Placeholder="Type a name...",Callback=function(v) customNameValue=v end})
-    ProtectionLeftGroupBox:AddButton("Apply Custom Name",function()
-        if not nameChangerEnabled then Library:Notify("Enable Name Changer first.",3) return end
-        if customNameValue=="" then Library:Notify("Type a name first.",3) return end
-        applyNameChange(customNameValue); Library:Notify("Name set to: "..customNameValue,3)
-    end)
-    ProtectionLeftGroupBox:AddButton("Generate Random Name",function()
-        if not nameChangerEnabled then Library:Notify("Enable Name Changer first.",3) return end
-        local n=generateRandomName()
-        applyNameChange(n); Options.CustomNameInput:SetValue(n); Library:Notify("Name: "..n,3)
-    end)
-    ProtectionLeftGroupBox:AddButton("Restore Original Name",function()
-        restoreOriginalName(); nameChangerEnabled=false
-        Toggles.NameChangerToggle:SetValue(false); Library:Notify("Name restored.",3)
-    end)
-
-    -- Re-apply name on respawn
-    LocalPlayer.CharacterAdded:Connect(function()
-        if nameChangerEnabled and customNameValue~="" then
-            task.wait(1); applyNameChange(customNameValue)
-        end
-    end)
-
     connections["ProtectionLoop"]=RunService.Heartbeat:Connect(function()
         if not featuresLocked and forceThirdPerson then
             if LocalPlayer.CameraMode~=Enum.CameraMode.Classic then LocalPlayer.CameraMode=Enum.CameraMode.Classic end
@@ -1284,6 +1177,109 @@ tryAutoExec(function(isAdmin,tier)
         if not featuresLocked and isLifetime and antiSpecEnabled and wasSpec then
             pcall(function() local root=getRoot(); if root then root.CFrame=root.CFrame*CFrame.Angles(0,math.rad(math.random(-180,180)),0) end end)
         end
+    end)
+
+    -- ================================================
+    -- NAME HIDER LOGIC (client-side visual only)
+    -- ================================================
+    local nameHiderEnabled=false
+    local originalDisplayName=LocalPlayer.DisplayName
+    local customHideName=""
+    local currentFakeName=""
+
+    local NAME_ADJ={"Shadow","Ghost","Silent","Dark","Void","Neon","Cyber","Faded","Crimson","Azure","Phantom","Stealth","Rogue","Apex","Viper","Blaze","Frost","Storm","Nova","Echo"}
+    local NAME_NOUN={"Walker","Blade","Storm","Wolf","Hunter","Shift","Edge","Drift","Pulse","Code","Strike","Glitch","Zero","Nexus","Flux","Shard","Pixel","Surge","Comet","Byte"}
+    local function generateRandomName()
+        return NAME_ADJ[math.random(#NAME_ADJ)]..NAME_NOUN[math.random(#NAME_NOUN)]..tostring(math.random(10,99))
+    end
+
+    local function applyNameHide(name)
+        currentFakeName=name
+        pcall(function()
+            local char=getCharacter(); if not char then return end
+            local hum=char:FindFirstChild("Humanoid")
+            if hum then hum.DisplayName=name end
+            -- Change all name labels in character overhead UI
+            for _,obj in pairs(char:GetDescendants()) do
+                if obj:IsA("BillboardGui") then
+                    for _,lbl in pairs(obj:GetDescendants()) do
+                        if lbl:IsA("TextLabel") then
+                            if lbl.Text==LocalPlayer.Name or lbl.Text==LocalPlayer.DisplayName or lbl.Text==originalDisplayName then
+                                lbl.Text=name
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function resetNameHide()
+        local old=currentFakeName; currentFakeName=""
+        pcall(function()
+            local char=getCharacter(); if not char then return end
+            local hum=char:FindFirstChild("Humanoid")
+            if hum then hum.DisplayName=originalDisplayName end
+            for _,obj in pairs(char:GetDescendants()) do
+                if obj:IsA("BillboardGui") then
+                    for _,lbl in pairs(obj:GetDescendants()) do
+                        if lbl:IsA("TextLabel") and lbl.Text==old then lbl.Text=originalDisplayName end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Persist name on respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        if nameHiderEnabled and currentFakeName~="" then task.wait(0.5); applyNameHide(currentFakeName) end
+    end)
+
+    -- Persistent loop to keep name applied every frame
+    connections["NameHider"]=RunService.Heartbeat:Connect(function()
+        if not nameHiderEnabled or featuresLocked or currentFakeName=="" then return end
+        pcall(function()
+            local char=getCharacter(); if not char then return end
+            local hum=char:FindFirstChild("Humanoid")
+            if hum and hum.DisplayName~=currentFakeName then hum.DisplayName=currentFakeName end
+            for _,obj in pairs(char:GetDescendants()) do
+                if obj:IsA("BillboardGui") then
+                    for _,lbl in pairs(obj:GetDescendants()) do
+                        if lbl:IsA("TextLabel") and (lbl.Text==LocalPlayer.Name or lbl.Text==originalDisplayName) then
+                            lbl.Text=currentFakeName
+                        end
+                    end
+                end
+            end
+        end)
+    end)
+
+    ProtectionRightGroupBox:AddLabel("Changes overhead name tag - visual only.")
+    ProtectionRightGroupBox:AddDivider()
+    ProtectionRightGroupBox:AddToggle("NameHiderToggle",{Text="Enable Name Hider",Default=false,Callback=function(v)
+        if featuresLocked then Toggles.NameHiderToggle:SetValue(false) return end
+        nameHiderEnabled=v
+        if not v then resetNameHide(); Library:Notify("Name restored: "..originalDisplayName,3) end
+    end})
+    ProtectionRightGroupBox:AddDivider()
+    ProtectionRightGroupBox:AddButton("🎲 Generate Random Name",function()
+        if featuresLocked then Library:Notify("Locked.",2) return end
+        local name=generateRandomName()
+        customHideName=name; Options.CustomNameInput:SetValue(name)
+        if nameHiderEnabled then applyNameHide(name) end
+        Library:Notify("Random name: "..name,3)
+    end)
+    ProtectionRightGroupBox:AddInput("CustomNameInput",{Default="",Numeric=false,Finished=false,Text="Custom Name",Placeholder="Type your fake name...",Callback=function(v) customHideName=v end})
+    ProtectionRightGroupBox:AddButton("✅ Apply Name",function()
+        if featuresLocked then Library:Notify("Locked.",2) return end
+        local name=customHideName
+        if name=="" then name=generateRandomName(); Options.CustomNameInput:SetValue(name) end
+        if not nameHiderEnabled then Toggles.NameHiderToggle:SetValue(true); nameHiderEnabled=true end
+        applyNameHide(name); Library:Notify("Name set: "..name,3)
+    end)
+    ProtectionRightGroupBox:AddButton("🔄 Reset to Real Name",function()
+        nameHiderEnabled=false; Toggles.NameHiderToggle:SetValue(false)
+        resetNameHide(); Library:Notify("Name restored: "..originalDisplayName,3)
     end)
 
     -- ================================================
@@ -1317,7 +1313,7 @@ tryAutoExec(function(isAdmin,tier)
         return best
     end
     RivalsLeftGB:AddToggle("WeaponSwitcherToggle",{Text="Auto Weapon Switcher",Default=false,Callback=function(v) if featuresLocked then Toggles.WeaponSwitcherToggle:SetValue(false) return end; weaponSwitcherEnabled=v end})
-    RivalsLeftGB:AddLabel("Switches to best weapon for enemy distance")
+    RivalsLeftGB:AddLabel("Auto-switches to best weapon by distance")
     connections["WeaponSwitcher"]=RunService.Heartbeat:Connect(function()
         if featuresLocked or not weaponSwitcherEnabled then return end
         pcall(function()
@@ -1412,15 +1408,15 @@ tryAutoExec(function(isAdmin,tier)
         end})
     else ExtrasRightGroupBox:AddLabel("[L] Anti AFK - Lifetime Only") end
 
+    -- Kill Sound
     local ksEnabled=false; local prevHP={}
     local ksound=Instance.new("Sound"); ksound.SoundId="rbxassetid://4612338345"; ksound.Volume=0.8; ksound.Parent=SoundService
     if isLifetime then
         ExtrasRightGroupBox:AddDivider()
         ExtrasRightGroupBox:AddToggle("KillSoundToggle",{Text="[L] Kill Sound",Default=false,Callback=function(v)
-            if featuresLocked then Toggles.KillSoundToggle:SetValue(false) return end
-            ksEnabled=v; prevHP={}
+            if featuresLocked then Toggles.KillSoundToggle:SetValue(false) return end; ksEnabled=v; prevHP={}
         end})
-        ExtrasRightGroupBox:AddDropdown("KillSoundType",{Values={"Hit Marker","Headshot","Cash Register","Level Up","Skull","Vine Boom","Bruh","Air Horn","Oof","Bonk"},Default=1,Multi=false,Text="Sound Type",Callback=function(v)
+        ExtrasRightGroupBox:AddDropdown("KillSoundType",{Values={"Hit Marker","Headshot","Cash Register","Level Up","Skull","Vine Boom","Bruh","Air Horn","Oof","Bonk"},Default=1,Multi=false,Text="Sound",Callback=function(v)
             local sounds={["Hit Marker"]="4612338345",["Headshot"]="142082588",["Cash Register"]="138186576",["Level Up"]="4612368723",["Skull"]="5982758739",["Vine Boom"]="5153734024",["Bruh"]="130987786",["Air Horn"]="130972653",["Oof"]="3360786373",["Bonk"]="6042053626"}
             ksound.SoundId="rbxassetid://"..(sounds[v] or "4612338345")
         end})
@@ -1432,37 +1428,22 @@ tryAutoExec(function(isAdmin,tier)
                 if not p.Character then prevHP[p]=nil; continue end
                 local h=p.Character:FindFirstChild("Humanoid")
                 if not h then prevHP[p]=nil; continue end
-                local cur=h.Health
-                local prev=prevHP[p]
-                if prev~=nil and prev>0 and cur<=0 then
-                    pcall(function() ksound:Play() end)
-                    Library:Notify(p.Name.." eliminated!",2)
-                end
+                local cur=h.Health; local prev=prevHP[p]
+                if prev~=nil and prev>0 and cur<=0 then pcall(function() ksound:Play() end); Library:Notify(p.Name.." eliminated! 💀",2) end
                 prevHP[p]=cur
             end
         end)
     else ExtrasRightGroupBox:AddLabel("[L] Kill Sound - Lifetime Only") end
 
     -- ================================================
-    -- CUSTOM CROSSHAIR LOGIC (50 styles)
+    -- CUSTOM CROSSHAIR LOGIC (50 styles, Lifetime only)
     -- ================================================
     local chEnabled=false; local chLines={}; local chColor=Color3.new(1,1,1); local chSize=12; local chThick=2; local chStyle="Classic Cross"; local chRainbow=false
-    local CH_STYLES={
-        "Classic Cross","Dot","Circle","T Shape","X Cross","Square Frame",
-        "Diamond","Corner Brackets","Sniper Scope","Double Cross","Chevron Up",
-        "Chevron Down","Arrow Up","Arrow Down","Reticle Ring","Brackets",
-        "Hash","Equals","Star 4pt","Star 6pt","Asterisk","Triangle Up",
-        "Triangle Down","Bowtie","Hourglass","Pinwheel","Trident",
-        "Anchor","Eye","Fish Bone","Two Swords","Crown","Lightning",
-        "Heart","Infinity","Flower","Rose","Spiral","Fence","Radar",
-        "Pentagon","Hexagon","Plus Bold","Cross Gap","NATO Sight",
-        "Biohazard Arms","Crossbow Sight","Sunburst","Death Cross","Holy Cross"
-    }
+    local CH_STYLES={"Classic Cross","Dot","Circle","T Shape","X Cross","Square Frame","Diamond","Corner Brackets","Sniper Scope","Double Cross","Chevron Up","Chevron Down","Arrow Up","Arrow Down","Reticle Ring","Brackets","Hash","Equals","Star 4pt","Star 6pt","Asterisk","Triangle Up","Triangle Down","Bowtie","Hourglass","Pinwheel","Trident","Anchor","Eye","Fish Bone","Two Swords","Crown","Lightning","Heart","Infinity","Flower","Rose","Spiral","Fence","Radar","Pentagon","Hexagon","Plus Bold","Cross Gap","NATO Sight","Biohazard Arms","Crossbow Sight","Sunburst","Death Cross","Holy Cross"}
     if isLifetime then
         ExtrasRightGroupBox:AddDivider()
         ExtrasRightGroupBox:AddToggle("CrosshairToggle",{Text="[L] Custom Crosshair",Default=false,Callback=function(v)
-            if featuresLocked then Toggles.CrosshairToggle:SetValue(false) return end
-            chEnabled=v
+            if featuresLocked then Toggles.CrosshairToggle:SetValue(false) return end; chEnabled=v
             if not v then for _,l in pairs(chLines) do pcall(function() l:Remove() end) end; chLines={} end
         end})
         ExtrasRightGroupBox:AddDropdown("CrosshairStyle",{Values=CH_STYLES,Default=1,Multi=false,Text="Style",Callback=function(v) chStyle=v end})
@@ -1470,26 +1451,15 @@ tryAutoExec(function(isAdmin,tier)
         ExtrasRightGroupBox:AddSlider("CrosshairThickness",{Text="Thickness",Default=2,Min=1,Max=8,Rounding=0,Callback=function(v) chThick=v end})
         ExtrasRightGroupBox:AddDropdown("CrosshairColor",{Values={"White","Red","Green","Blue","Yellow","Cyan","Pink","Orange","Purple","Lime","Rainbow"},Default=1,Multi=false,Text="Color",Callback=function(v)
             chRainbow=(v=="Rainbow")
-            if not chRainbow then
-                local c={White=Color3.new(1,1,1),Red=Color3.fromRGB(255,50,50),Green=Color3.fromRGB(50,255,50),Blue=Color3.fromRGB(50,150,255),Yellow=Color3.fromRGB(255,240,50),Cyan=Color3.fromRGB(50,240,240),Pink=Color3.fromRGB(255,100,200),Orange=Color3.fromRGB(255,140,50),Purple=Color3.fromRGB(180,60,255),Lime=Color3.fromRGB(140,255,50)}
-                chColor=c[v] or Color3.new(1,1,1)
-            end
+            if not chRainbow then local c={White=Color3.new(1,1,1),Red=Color3.fromRGB(255,50,50),Green=Color3.fromRGB(50,255,50),Blue=Color3.fromRGB(50,150,255),Yellow=Color3.fromRGB(255,240,50),Cyan=Color3.fromRGB(50,240,240),Pink=Color3.fromRGB(255,100,200),Orange=Color3.fromRGB(255,140,50),Purple=Color3.fromRGB(180,60,255),Lime=Color3.fromRGB(140,255,50)}; chColor=c[v] or Color3.new(1,1,1) end
         end})
         connections["Crosshair"]=RunService.RenderStepped:Connect(function()
             for _,l in pairs(chLines) do pcall(function() l:Remove() end) end; chLines={}
             if featuresLocked or not chEnabled then return end
-            local cx=Camera.ViewportSize.X/2; local cy=Camera.ViewportSize.Y/2
-            local s=chSize; local t=chThick
+            local cx=Camera.ViewportSize.X/2; local cy=Camera.ViewportSize.Y/2; local s=chSize; local t=chThick
             local col=chRainbow and Color3.fromHSV(tick()%4/4,1,1) or chColor
-            local function L(x1,y1,x2,y2,thick)
-                local l=Drawing.new("Line"); l.From=Vector2.new(x1,y1); l.To=Vector2.new(x2,y2)
-                l.Color=col; l.Thickness=thick or t; l.Transparency=1; l.Visible=true; chLines[#chLines+1]=l
-            end
-            local function C(x,y,r,filled,sides)
-                local c2=Drawing.new("Circle"); c2.Position=Vector2.new(x,y); c2.Radius=r
-                c2.Color=col; c2.Thickness=t; c2.Transparency=1; c2.Filled=filled or false
-                c2.NumSides=sides or 32; c2.Visible=true; chLines[#chLines+1]=c2
-            end
+            local function L(x1,y1,x2,y2,thick) local l=Drawing.new("Line"); l.From=Vector2.new(x1,y1); l.To=Vector2.new(x2,y2); l.Color=col; l.Thickness=thick or t; l.Transparency=1; l.Visible=true; chLines[#chLines+1]=l end
+            local function C(x,y,r,filled,sides) local c2=Drawing.new("Circle"); c2.Position=Vector2.new(x,y); c2.Radius=r; c2.Color=col; c2.Thickness=t; c2.Transparency=1; c2.Filled=filled or false; c2.NumSides=sides or 32; c2.Visible=true; chLines[#chLines+1]=c2 end
             local function poly(pts) for i=1,#pts do local a=pts[i]; local b=pts[i%#pts+1]; L(a[1],a[2],b[1],b[2]) end end
             local function ngon(cx2,cy2,r,n,rot) local pts={}; for i=1,n do local a=(i-1)/n*math.pi*2+(rot or 0); pts[#pts+1]={cx2+math.cos(a)*r,cy2+math.sin(a)*r} end; poly(pts) end
             if chStyle=="Classic Cross" then L(cx-s,cy,cx-4,cy); L(cx+4,cy,cx+s,cy); L(cx,cy-s,cx,cy-4); L(cx,cy+4,cx,cy+s)
@@ -1526,7 +1496,7 @@ tryAutoExec(function(isAdmin,tier)
             elseif chStyle=="Crown" then L(cx-s,cy+s*0.35,cx+s,cy+s*0.35); L(cx-s,cy+s*0.35,cx-s,cy-s*0.15); L(cx+s,cy+s*0.35,cx+s,cy-s*0.15); L(cx-s,cy-s*0.15,cx-s*0.5,cy-s*0.75); L(cx-s*0.5,cy-s*0.75,cx,cy-s*0.2); L(cx,cy-s*0.2,cx+s*0.5,cy-s*0.75); L(cx+s*0.5,cy-s*0.75,cx+s,cy-s*0.15); C(cx,cy-s*0.1,s*0.14,true)
             elseif chStyle=="Lightning" then L(cx+s*0.25,cy-s,cx-s*0.05,cy-s*0.05); L(cx-s*0.05,cy-s*0.05,cx+s*0.15,cy-s*0.05); L(cx+s*0.15,cy-s*0.05,cx-s*0.25,cy+s)
             elseif chStyle=="Heart" then local N=60; for i=0,N-1 do local a1=i/N*math.pi*2; local a2=(i+1)/N*math.pi*2; local function hx(a) return cx+s*0.45*(16*math.sin(a)^3)/16 end; local function hy(a) return cy-s*0.45*(13*math.cos(a)-5*math.cos(2*a)-2*math.cos(3*a)-math.cos(4*a))/16 end; L(hx(a1),hy(a1),hx(a2),hy(a2)) end
-            elseif chStyle=="Infinity" then local N=80; local a2=s*0.8; for i=0,N-1 do local t1=i/N*math.pi*2; local t2=(i+1)/N*math.pi*2; local function lx(tt) return cx+a2*math.cos(tt)/(1+math.sin(tt)^2) end; local function ly(tt) return cy+a2*math.sin(tt)*math.cos(tt)/(1+math.sin(tt)^2) end; L(lx(t1),ly(t1),lx(t2),ly(t2)) end
+            elseif chStyle=="Infinity" then local N=80; local a2s=s*0.8; for i=0,N-1 do local t1=i/N*math.pi*2; local t2=(i+1)/N*math.pi*2; local function lx(tt) return cx+a2s*math.cos(tt)/(1+math.sin(tt)^2) end; local function ly(tt) return cy+a2s*math.sin(tt)*math.cos(tt)/(1+math.sin(tt)^2) end; L(lx(t1),ly(t1),lx(t2),ly(t2)) end
             elseif chStyle=="Flower" then for i=0,7 do local a=i/8*math.pi*2; C(cx+math.cos(a)*s*0.6,cy+math.sin(a)*s*0.6,s*0.28) end; C(cx,cy,s*0.18,true)
             elseif chStyle=="Rose" then local N=100; for i=0,N-1 do local a1=i/N*math.pi*4; local a2=(i+1)/N*math.pi*4; local function rx(aa) return cx+math.cos(3*aa)*math.cos(aa)*s end; local function ry(aa) return cy+math.cos(3*aa)*math.sin(aa)*s end; L(rx(a1),ry(a1),rx(a2),ry(a2)) end
             elseif chStyle=="Spiral" then local N=80; for i=0,N-1 do local a1=i/N*math.pi*6; local r1=i/N*s; local a2=(i+1)/N*math.pi*6; local r2=(i+1)/N*s; L(cx+math.cos(a1)*r1,cy+math.sin(a1)*r1,cx+math.cos(a2)*r2,cy+math.sin(a2)*r2) end
@@ -1534,7 +1504,7 @@ tryAutoExec(function(isAdmin,tier)
             elseif chStyle=="Radar" then C(cx,cy,s); C(cx,cy,s*0.55); C(cx,cy,s*0.2,true); L(cx,cy,cx+math.cos(-math.pi/4)*s,cy+math.sin(-math.pi/4)*s); L(cx,cy,cx+math.cos(-math.pi/8)*s,cy+math.sin(-math.pi/8)*s)
             elseif chStyle=="Pentagon" then ngon(cx,cy,s,5,-math.pi/2)
             elseif chStyle=="Hexagon" then ngon(cx,cy,s,6,0)
-            elseif chStyle=="Plus Bold" then local hw=t*2; L(cx-s,cy,cx+s,cy,hw*2); L(cx,cy-s,cx,cy+s,hw*2)
+            elseif chStyle=="Plus Bold" then L(cx-s,cy,cx+s,cy,t*3); L(cx,cy-s,cx,cy+s,t*3)
             elseif chStyle=="Cross Gap" then local gap=s*0.25; L(cx-s,cy,cx-gap,cy); L(cx+gap,cy,cx+s,cy); L(cx,cy-s,cx,cy-gap); L(cx,cy+gap,cx,cy+s); C(cx,cy,gap*0.4)
             elseif chStyle=="NATO Sight" then C(cx,cy,s*0.8); L(cx-s*1.4,cy,cx+s*1.4,cy); L(cx,cy-s*1.4,cx,cy+s*1.4); C(cx,cy,s*0.15,true)
             elseif chStyle=="Biohazard Arms" then for i=0,2 do local a=i/3*math.pi*2-math.pi/2; C(cx+math.cos(a)*s*0.4,cy+math.sin(a)*s*0.4,s*0.35) end; C(cx,cy,s*0.18); C(cx,cy,s*0.08,true)
@@ -1546,7 +1516,7 @@ tryAutoExec(function(isAdmin,tier)
     else ExtrasRightGroupBox:AddLabel("[L] Custom Crosshair - Lifetime Only") end
 
     -- ================================================
-    -- MAP COLOR CHANGER LOGIC — FIXED BRIGHTNESS
+    -- MAP COLOR CHANGER LOGIC
     -- ================================================
     local origAmb=Lighting.Ambient; local origOut=Lighting.OutdoorAmbient; local origBri=Lighting.Brightness
     local origCST=Lighting.ColorShift_Top; local origCSB=Lighting.ColorShift_Bottom; local mapEnabled=false
@@ -1563,21 +1533,21 @@ tryAutoExec(function(isAdmin,tier)
     local MapRightGB=Tabs.MapChanger:AddRightGroupbox("Custom Settings")
     if isLifetime then
         MapLeftGB:AddToggle("MapColorToggle",{Text="Enable Map Color Changer",Default=false,Callback=function(v) if featuresLocked then Toggles.MapColorToggle:SetValue(false) return end; mapEnabled=v; if not v then resetMap() end end})
-        MapLeftGB:AddDivider(); MapLeftGB:AddLabel("Enable toggle first then pick preset:")
-        -- FIXED: Brightness values raised, tint colors softened so map stays visible
+        MapLeftGB:AddDivider(); MapLeftGB:AddLabel("Enable toggle first, then pick a preset:")
+        -- BRIGHT playable presets - Brightness 0.8 minimum
         local presets={
-            {"Black",      function() Lighting.Brightness=0.85; Lighting.Ambient=Color3.fromRGB(25,25,25); Lighting.OutdoorAmbient=Color3.fromRGB(25,25,25); local cc=getCC(); cc.Brightness=-0.06; cc.Contrast=0.12; cc.Saturation=-0.1; cc.TintColor=Color3.fromRGB(90,90,90) end},
-            {"Dark Red",   function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(55,15,15); Lighting.OutdoorAmbient=Color3.fromRGB(55,15,15); local cc=getCC(); cc.TintColor=Color3.fromRGB(215,120,120); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
-            {"Dark Blue",  function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(15,15,55); Lighting.OutdoorAmbient=Color3.fromRGB(15,15,55); local cc=getCC(); cc.TintColor=Color3.fromRGB(120,120,215); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
-            {"Dark Green", function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(15,45,15); Lighting.OutdoorAmbient=Color3.fromRGB(15,45,15); local cc=getCC(); cc.TintColor=Color3.fromRGB(120,205,120); cc.Saturation=0.12; cc.Brightness=-0.03; cc.Contrast=0.08 end},
-            {"Dark Purple",function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(30,15,50); Lighting.OutdoorAmbient=Color3.fromRGB(30,15,50); local cc=getCC(); cc.TintColor=Color3.fromRGB(165,110,225); cc.Saturation=0.18; cc.Brightness=-0.03; cc.Contrast=0.08 end},
-            {"Night",      function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(35,35,65); Lighting.OutdoorAmbient=Color3.fromRGB(35,35,65); local cc=getCC(); cc.Brightness=-0.04; cc.Contrast=0.08; cc.Saturation=-0.04; cc.TintColor=Color3.fromRGB(105,105,215) end},
-            {"Sunset",     function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(220,130,70); cc.Brightness=0; cc.Saturation=0.2; cc.Contrast=0.1 end},
-            {"Neon",       function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(80,220,150); cc.Brightness=0; cc.Saturation=0.4; cc.Contrast=0.15 end},
-            {"Sepia",      function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(200,165,120); cc.Saturation=-0.15; cc.Brightness=0; cc.Contrast=0.1 end},
-            {"Greyscale",  function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=-1; cc.Brightness=0; cc.Contrast=0.08 end},
-            {"Vivid",      function() Lighting.Brightness=1.1; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=0.6; cc.Brightness=0.05; cc.Contrast=0.2 end},
-            {"Cold",       function() Lighting.Brightness=1.0; local cc=getCC(); cc.TintColor=Color3.fromRGB(120,155,220); cc.Saturation=0.15; cc.Brightness=-0.02; cc.Contrast=0.1 end},
+            {"Black",       function() Lighting.Brightness=0.7; Lighting.Ambient=Color3.fromRGB(20,20,20); Lighting.OutdoorAmbient=Color3.fromRGB(20,20,20); local cc=getCC(); cc.Brightness=-0.08; cc.Contrast=0.12; cc.Saturation=-0.08; cc.TintColor=Color3.fromRGB(80,80,80) end},
+            {"Dark Red",    function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(55,10,10); Lighting.OutdoorAmbient=Color3.fromRGB(55,10,10); local cc=getCC(); cc.TintColor=Color3.fromRGB(215,90,90); cc.Saturation=0.18; cc.Brightness=-0.04; cc.Contrast=0.1 end},
+            {"Dark Blue",   function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(10,10,55); Lighting.OutdoorAmbient=Color3.fromRGB(10,10,55); local cc=getCC(); cc.TintColor=Color3.fromRGB(90,90,215); cc.Saturation=0.18; cc.Brightness=-0.04; cc.Contrast=0.1 end},
+            {"Dark Green",  function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(10,45,10); Lighting.OutdoorAmbient=Color3.fromRGB(10,45,10); local cc=getCC(); cc.TintColor=Color3.fromRGB(90,200,90); cc.Saturation=0.18; cc.Brightness=-0.04; cc.Contrast=0.1 end},
+            {"Dark Purple", function() Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(28,8,45); Lighting.OutdoorAmbient=Color3.fromRGB(28,8,45); local cc=getCC(); cc.TintColor=Color3.fromRGB(155,85,225); cc.Saturation=0.18; cc.Brightness=-0.04; cc.Contrast=0.1 end},
+            {"Night",       function() Lighting.Brightness=0.8; Lighting.Ambient=Color3.fromRGB(28,28,55); Lighting.OutdoorAmbient=Color3.fromRGB(28,28,55); local cc=getCC(); cc.Brightness=-0.03; cc.Contrast=0.08; cc.Saturation=-0.04; cc.TintColor=Color3.fromRGB(100,100,220) end},
+            {"Sunset",      function() Lighting.Brightness=1.2; local cc=getCC(); cc.TintColor=Color3.fromRGB(230,120,60); cc.Brightness=0.02; cc.Saturation=0.2; cc.Contrast=0.1 end},
+            {"Neon",        function() Lighting.Brightness=1.2; local cc=getCC(); cc.TintColor=Color3.fromRGB(60,210,140); cc.Brightness=0.02; cc.Saturation=0.4; cc.Contrast=0.15 end},
+            {"Sepia",       function() Lighting.Brightness=1.2; local cc=getCC(); cc.TintColor=Color3.fromRGB(200,160,110); cc.Saturation=-0.1; cc.Brightness=0.02; cc.Contrast=0.1 end},
+            {"Greyscale",   function() Lighting.Brightness=1.2; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=-1; cc.Brightness=0.02; cc.Contrast=0.08 end},
+            {"Vivid",       function() Lighting.Brightness=1.4; local cc=getCC(); cc.TintColor=Color3.new(1,1,1); cc.Saturation=0.6; cc.Brightness=0.05; cc.Contrast=0.2 end},
+            {"Cold",        function() Lighting.Brightness=1.1; local cc=getCC(); cc.TintColor=Color3.fromRGB(110,150,220); cc.Saturation=0.15; cc.Brightness=0; cc.Contrast=0.1 end},
         }
         for _,preset in ipairs(presets) do
             local p=preset
@@ -1585,8 +1555,8 @@ tryAutoExec(function(isAdmin,tier)
         end
         MapRightGB:AddLabel("Custom Adjustments"); MapRightGB:AddDivider()
         MapRightGB:AddDropdown("MapTintColor",{Values={"White","Red","Green","Blue","Yellow","Purple","Orange","Cyan"},Default=1,Multi=false,Text="Tint Color",Callback=function(v) if not mapEnabled or featuresLocked then return end; local colors={White=Color3.new(1,1,1),Red=Color3.new(1,0,0),Green=Color3.new(0,1,0),Blue=Color3.new(0,0,1),Yellow=Color3.new(1,1,0),Purple=Color3.fromRGB(160,50,230),Orange=Color3.fromRGB(255,130,50),Cyan=Color3.new(0,1,1)}; getCC().TintColor=colors[v] or Color3.new(1,1,1) end})
-        MapRightGB:AddDropdown("MapAmbientColor",{Values={"Default","Dark","Very Dark","Red Tint","Blue Tint","Green Tint","Purple Tint"},Default=1,Multi=false,Text="Ambient Color",Callback=function(v) if not mapEnabled or featuresLocked then return end; local colors={Default=Color3.fromRGB(70,70,70),Dark=Color3.fromRGB(8,8,8),["Very Dark"]=Color3.fromRGB(2,2,2),["Red Tint"]=Color3.fromRGB(18,1,1),["Blue Tint"]=Color3.fromRGB(1,1,18),["Green Tint"]=Color3.fromRGB(1,12,1),["Purple Tint"]=Color3.fromRGB(8,1,14)}; local c=colors[v] or Color3.fromRGB(70,70,70); Lighting.Ambient=c; Lighting.OutdoorAmbient=c end})
-        MapRightGB:AddSlider("MapBrightness",{Text="Brightness",Default=10,Min=1,Max=30,Rounding=0,Callback=function(v) if not mapEnabled or featuresLocked then return end; Lighting.Brightness=v/10 end})
+        MapRightGB:AddDropdown("MapAmbientColor",{Values={"Default","Dark","Very Dark","Red Tint","Blue Tint","Green Tint","Purple Tint"},Default=1,Multi=false,Text="Ambient",Callback=function(v) if not mapEnabled or featuresLocked then return end; local colors={Default=Color3.fromRGB(70,70,70),Dark=Color3.fromRGB(20,20,20),["Very Dark"]=Color3.fromRGB(5,5,5),["Red Tint"]=Color3.fromRGB(40,5,5),["Blue Tint"]=Color3.fromRGB(5,5,40),["Green Tint"]=Color3.fromRGB(5,25,5),["Purple Tint"]=Color3.fromRGB(20,5,30)}; local c=colors[v] or Color3.fromRGB(70,70,70); Lighting.Ambient=c; Lighting.OutdoorAmbient=c end})
+        MapRightGB:AddSlider("MapBrightness",{Text="Brightness",Default=12,Min=5,Max=30,Rounding=0,Callback=function(v) if not mapEnabled or featuresLocked then return end; Lighting.Brightness=v/10 end})
         MapRightGB:AddSlider("MapSaturation",{Text="Saturation",Default=10,Min=0,Max=20,Rounding=0,Callback=function(v) if not mapEnabled or featuresLocked then return end; getCC().Saturation=(v-10)/10 end})
         MapRightGB:AddSlider("MapContrast",{Text="Contrast",Default=10,Min=0,Max=20,Rounding=0,Callback=function(v) if not mapEnabled or featuresLocked then return end; getCC().Contrast=(v-10)/10 end})
         MapRightGB:AddDivider(); MapRightGB:AddButton("Reset All Colors",function() resetMap(); Library:Notify("Map colors reset!",3) end)
@@ -1596,78 +1566,72 @@ tryAutoExec(function(isAdmin,tier)
     end
 
     -- ================================================
-    -- SKY CHANGER LOGIC — FIXED (Atmosphere + Lighting, no asset IDs)
+    -- SKY CHANGER LOGIC (Lighting-based, always works)
     -- ================================================
-    local origSky = nil
-    local origClockTime = Lighting.ClockTime
-    local origBrightness2 = Lighting.Brightness
-    local origAmb2 = Lighting.Ambient
-    local origOut2 = Lighting.OutdoorAmbient
-
-    local function saveSky()
-        if origSky then return end
-        local sky=Lighting:FindFirstChildOfClass("Sky")
-        if sky then
-            origSky={Bk=sky.SkyboxBk,Dn=sky.SkyboxDn,Ft=sky.SkyboxFt,Lf=sky.SkyboxLf,Rt=sky.SkyboxRt,Up=sky.SkyboxUp}
-        else
-            origSky={none=true}
+    local origLightingCache=nil
+    local function saveLightingState()
+        if not origLightingCache then
+            origLightingCache={ClockTime=Lighting.ClockTime,Brightness=Lighting.Brightness,Ambient=Lighting.Ambient,OutdoorAmbient=Lighting.OutdoorAmbient,FogEnd=Lighting.FogEnd,FogColor=Lighting.FogColor}
         end
     end
-
-    local function getOrCreateAtm()
-        local atm=Lighting:FindFirstChild("RivalsAtm")
-        if not atm then atm=Instance.new("Atmosphere"); atm.Name="RivalsAtm"; atm.Parent=Lighting end
-        return atm
-    end
-
     local function resetSky()
-        if origSky and not origSky.none then
-            local sky=Lighting:FindFirstChildOfClass("Sky")
-            if sky then sky.SkyboxBk=origSky.Bk; sky.SkyboxDn=origSky.Dn; sky.SkyboxFt=origSky.Ft; sky.SkyboxLf=origSky.Lf; sky.SkyboxRt=origSky.Rt; sky.SkyboxUp=origSky.Up end
+        if origLightingCache then
+            Lighting.ClockTime=origLightingCache.ClockTime; Lighting.Brightness=origLightingCache.Brightness
+            Lighting.Ambient=origLightingCache.Ambient; Lighting.OutdoorAmbient=origLightingCache.OutdoorAmbient
+            Lighting.FogEnd=origLightingCache.FogEnd; Lighting.FogColor=origLightingCache.FogColor
         end
-        local ratm=Lighting:FindFirstChild("RivalsAtm"); if ratm then ratm:Destroy() end
-        Lighting.ClockTime=origClockTime
-        Lighting.Brightness=origBrightness2
-        Lighting.Ambient=origAmb2
-        Lighting.OutdoorAmbient=origOut2
     end
 
+    -- 20 sky presets — ALL use Lighting manipulation so they work in every game
     local SKY_PRESETS={
-        {name="Space",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.3; Lighting.Ambient=Color3.fromRGB(0,0,10); Lighting.OutdoorAmbient=Color3.fromRGB(0,0,10); local a=getOrCreateAtm(); a.Density=0; a.Offset=0.25; a.Color=Color3.fromRGB(5,5,20); a.Decay=Color3.fromRGB(0,0,0); a.Glare=0; a.Haze=0 end},
-        {name="Blood Moon",apply=function() saveSky(); Lighting.ClockTime=1; Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(40,0,0); Lighting.OutdoorAmbient=Color3.fromRGB(40,0,0); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(160,20,20); a.Decay=Color3.fromRGB(80,0,0); a.Glare=0.3; a.Haze=3 end},
-        {name="Deep Night",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.5; Lighting.Ambient=Color3.fromRGB(5,5,25); Lighting.OutdoorAmbient=Color3.fromRGB(5,5,25); local a=getOrCreateAtm(); a.Density=0.2; a.Offset=0.1; a.Color=Color3.fromRGB(10,10,60); a.Decay=Color3.fromRGB(5,5,30); a.Glare=0.1; a.Haze=1 end},
-        {name="Sunset",apply=function() saveSky(); Lighting.ClockTime=18.5; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(90,45,20); Lighting.OutdoorAmbient=Color3.fromRGB(110,65,30); local a=getOrCreateAtm(); a.Density=0.4; a.Offset=0.25; a.Color=Color3.fromRGB(199,170,107); a.Decay=Color3.fromRGB(255,75,0); a.Glare=0.5; a.Haze=2.5 end},
-        {name="Arctic White",apply=function() saveSky(); Lighting.ClockTime=12; Lighting.Brightness=1.5; Lighting.Ambient=Color3.fromRGB(160,180,200); Lighting.OutdoorAmbient=Color3.fromRGB(180,200,220); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(180,200,230); a.Decay=Color3.fromRGB(200,220,255); a.Glare=0.4; a.Haze=2 end},
-        {name="Neon City",apply=function() saveSky(); Lighting.ClockTime=22; Lighting.Brightness=0.6; Lighting.Ambient=Color3.fromRGB(20,0,40); Lighting.OutdoorAmbient=Color3.fromRGB(20,0,40); local a=getOrCreateAtm(); a.Density=0.4; a.Offset=0.1; a.Color=Color3.fromRGB(100,0,200); a.Decay=Color3.fromRGB(200,0,100); a.Glare=0.6; a.Haze=4 end},
-        {name="Ocean Blue",apply=function() saveSky(); Lighting.ClockTime=14; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(20,50,100); Lighting.OutdoorAmbient=Color3.fromRGB(30,70,140); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.2; a.Color=Color3.fromRGB(50,120,200); a.Decay=Color3.fromRGB(30,80,150); a.Glare=0.3; a.Haze=2 end},
-        {name="Toxic",apply=function() saveSky(); Lighting.ClockTime=12; Lighting.Brightness=0.9; Lighting.Ambient=Color3.fromRGB(10,40,10); Lighting.OutdoorAmbient=Color3.fromRGB(10,50,10); local a=getOrCreateAtm(); a.Density=0.5; a.Offset=0.1; a.Color=Color3.fromRGB(80,200,50); a.Decay=Color3.fromRGB(30,100,20); a.Glare=0.3; a.Haze=5 end},
-        {name="Desert",apply=function() saveSky(); Lighting.ClockTime=13; Lighting.Brightness=1.4; Lighting.Ambient=Color3.fromRGB(120,90,50); Lighting.OutdoorAmbient=Color3.fromRGB(150,110,60); local a=getOrCreateAtm(); a.Density=0.35; a.Offset=0.2; a.Color=Color3.fromRGB(210,180,120); a.Decay=Color3.fromRGB(180,130,70); a.Glare=0.6; a.Haze=3 end},
-        {name="Apocalypse",apply=function() saveSky(); Lighting.ClockTime=16; Lighting.Brightness=0.8; Lighting.Ambient=Color3.fromRGB(70,25,0); Lighting.OutdoorAmbient=Color3.fromRGB(70,25,0); local a=getOrCreateAtm(); a.Density=0.5; a.Offset=0.15; a.Color=Color3.fromRGB(200,80,30); a.Decay=Color3.fromRGB(150,40,10); a.Glare=0.5; a.Haze=5 end},
-        {name="Galaxy",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.2; Lighting.Ambient=Color3.fromRGB(5,0,15); Lighting.OutdoorAmbient=Color3.fromRGB(5,0,15); local a=getOrCreateAtm(); a.Density=0; a.Offset=0; a.Color=Color3.fromRGB(30,0,60); a.Decay=Color3.fromRGB(10,0,30); a.Glare=0; a.Haze=0 end},
-        {name="Sunny Day",apply=function() saveSky(); Lighting.ClockTime=14; Lighting.Brightness=1.5; Lighting.Ambient=Color3.fromRGB(120,130,140); Lighting.OutdoorAmbient=Color3.fromRGB(140,150,160); local a=getOrCreateAtm(); a.Density=0.395; a.Offset=0.25; a.Color=Color3.fromRGB(199,199,199); a.Decay=Color3.fromRGB(160,160,160); a.Glare=0.3; a.Haze=0 end},
-        {name="Cotton Candy",apply=function() saveSky(); Lighting.ClockTime=15; Lighting.Brightness=1.2; Lighting.Ambient=Color3.fromRGB(180,120,180); Lighting.OutdoorAmbient=Color3.fromRGB(200,140,200); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.15; a.Color=Color3.fromRGB(230,170,230); a.Decay=Color3.fromRGB(200,140,210); a.Glare=0.4; a.Haze=2 end},
-        {name="Midnight Purple",apply=function() saveSky(); Lighting.ClockTime=0; Lighting.Brightness=0.4; Lighting.Ambient=Color3.fromRGB(20,5,35); Lighting.OutdoorAmbient=Color3.fromRGB(20,5,35); local a=getOrCreateAtm(); a.Density=0.3; a.Offset=0.1; a.Color=Color3.fromRGB(80,20,140); a.Decay=Color3.fromRGB(40,5,80); a.Glare=0.2; a.Haze=2 end},
+        {name="Bright Noon",   clock=12,bright=2.5,amb=Color3.fromRGB(160,160,160),out=Color3.fromRGB(160,160,160),fog=100000,fogcol=Color3.fromRGB(192,196,200)},
+        {name="Golden Hour",   clock=17,bright=1.8,amb=Color3.fromRGB(140,90,50),  out=Color3.fromRGB(180,130,70), fog=80000, fogcol=Color3.fromRGB(255,200,120)},
+        {name="Blood Sunset",  clock=18,bright=1.5,amb=Color3.fromRGB(120,30,15),  out=Color3.fromRGB(180,50,20),  fog=50000, fogcol=Color3.fromRGB(255,100,60)},
+        {name="Dawn",          clock=6, bright=1.4,amb=Color3.fromRGB(100,60,40),  out=Color3.fromRGB(150,100,60), fog=30000, fogcol=Color3.fromRGB(220,160,100)},
+        {name="Midday Bright", clock=13,bright=3.0,amb=Color3.fromRGB(180,180,180),out=Color3.fromRGB(180,180,180),fog=100000,fogcol=Color3.fromRGB(200,210,220)},
+        {name="Arctic White",  clock=12,bright=2.2,amb=Color3.fromRGB(210,220,230),out=Color3.fromRGB(210,220,230),fog=2000,  fogcol=Color3.fromRGB(240,245,255)},
+        {name="Desert Heat",   clock=13,bright=2.5,amb=Color3.fromRGB(160,130,60), out=Color3.fromRGB(180,150,80), fog=60000, fogcol=Color3.fromRGB(255,230,150)},
+        {name="Foggy Morning", clock=7, bright=1.2,amb=Color3.fromRGB(100,100,100),out=Color3.fromRGB(110,110,110),fog=400,   fogcol=Color3.fromRGB(200,200,200)},
+        {name="Stormy",        clock=12,bright=0.9,amb=Color3.fromRGB(50,50,55),   out=Color3.fromRGB(60,60,65),   fog=3000,  fogcol=Color3.fromRGB(80,80,90)},
+        {name="Overcast",      clock=12,bright=1.1,amb=Color3.fromRGB(80,80,85),   out=Color3.fromRGB(90,90,95),   fog=8000,  fogcol=Color3.fromRGB(160,160,165)},
+        {name="Midnight",      clock=0, bright=0.5,amb=Color3.fromRGB(10,10,30),   out=Color3.fromRGB(10,10,30),   fog=2000,  fogcol=Color3.fromRGB(20,20,50)},
+        {name="Deep Night",    clock=1, bright=0.4,amb=Color3.fromRGB(5,5,15),     out=Color3.fromRGB(5,5,15),     fog=800,   fogcol=Color3.fromRGB(10,10,30)},
+        {name="Blue Night",    clock=23,bright=0.6,amb=Color3.fromRGB(8,15,50),    out=Color3.fromRGB(10,20,70),   fog=3000,  fogcol=Color3.fromRGB(20,40,100)},
+        {name="Purple Dusk",   clock=19,bright=1.2,amb=Color3.fromRGB(50,10,80),   out=Color3.fromRGB(70,15,110),  fog=30000, fogcol=Color3.fromRGB(120,50,180)},
+        {name="Red Alert",     clock=12,bright=1.2,amb=Color3.fromRGB(100,8,8),    out=Color3.fromRGB(120,10,10),  fog=3000,  fogcol=Color3.fromRGB(160,20,20)},
+        {name="Toxic Green",   clock=12,bright=1.2,amb=Color3.fromRGB(8,80,8),     out=Color3.fromRGB(10,100,10),  fog=4000,  fogcol=Color3.fromRGB(20,150,20)},
+        {name="Ocean Depth",   clock=12,bright=0.7,amb=Color3.fromRGB(5,25,80),    out=Color3.fromRGB(5,35,100),   fog=1000,  fogcol=Color3.fromRGB(10,60,150)},
+        {name="Volcanic",      clock=0, bright=1.0,amb=Color3.fromRGB(100,25,0),   out=Color3.fromRGB(120,35,0),   fog=600,   fogcol=Color3.fromRGB(180,60,0)},
+        {name="Neon Purple",   clock=0, bright=0.7,amb=Color3.fromRGB(50,0,100),   out=Color3.fromRGB(70,0,140),   fog=1500,  fogcol=Color3.fromRGB(120,0,220)},
+        {name="Cyber Blue",    clock=0, bright=0.8,amb=Color3.fromRGB(0,25,100),   out=Color3.fromRGB(0,35,140),   fog=2000,  fogcol=Color3.fromRGB(0,80,220)},
     }
 
     local SkyLeftGB=Tabs.SkyChanger:AddLeftGroupbox("Sky Presets")
-    local SkyRightGB=Tabs.SkyChanger:AddRightGroupbox("Sky Info")
+    local SkyRightGB=Tabs.SkyChanger:AddRightGroupbox("Sky Controls")
     if isLifetime then
-        SkyLeftGB:AddLabel("Uses Atmosphere + Lighting - always works:")
+        SkyLeftGB:AddLabel("Changes Lighting to simulate skies.")
+        SkyLeftGB:AddLabel("Works in every game. Client-side only.")
         SkyLeftGB:AddDivider()
         local currentSkyLabel=SkyRightGB:AddLabel("Current: Default")
         SkyRightGB:AddDivider()
-        SkyRightGB:AddLabel("Client-side only.")
-        SkyRightGB:AddLabel("Other players see the normal sky.")
-        SkyRightGB:AddLabel("Resets on script unload.")
+        SkyRightGB:AddLabel("Resets when you unload the script.")
         SkyRightGB:AddDivider()
-        SkyRightGB:AddButton("Reset to Default",function()
-            resetSky(); currentSkyLabel:SetText("Current: Default"); Library:Notify("Sky reset!",3)
-        end)
+        SkyRightGB:AddSlider("SkyTimeSlider",{Text="Manual Time",Default=12,Min=0,Max=24,Rounding=1,Suffix="h",Callback=function(v)
+            if featuresLocked then return end; saveLightingState(); Lighting.ClockTime=v; currentSkyLabel:SetText("Current: Custom Time ("..v.."h)")
+        end})
+        SkyRightGB:AddSlider("SkyBrightSlider",{Text="Manual Brightness",Default=15,Min=1,Max=30,Rounding=0,Callback=function(v)
+            if featuresLocked then return end; saveLightingState(); Lighting.Brightness=v/10
+        end})
+        SkyRightGB:AddDivider()
+        SkyRightGB:AddButton("Reset Sky",function() resetSky(); currentSkyLabel:SetText("Current: Default"); Library:Notify("Sky reset!",3) end)
         for _,preset in ipairs(SKY_PRESETS) do
             local p=preset
             SkyLeftGB:AddButton(p.name,function()
                 if featuresLocked then Library:Notify("Locked.",2) return end
-                p.apply()
+                saveLightingState()
+                Lighting.ClockTime=p.clock; Lighting.Brightness=p.bright
+                Lighting.Ambient=p.amb; Lighting.OutdoorAmbient=p.out
+                Lighting.FogEnd=p.fog; Lighting.FogColor=p.fogcol
                 currentSkyLabel:SetText("Current: "..p.name)
                 Library:Notify(p.name.." applied!",3)
             end)
@@ -1691,8 +1655,7 @@ tryAutoExec(function(isAdmin,tier)
             if part:IsA("MeshPart") then originalTextures[weapon.Name][part.Name]={TextureID=part.TextureID,Color=part.Color,Material=part.Material}
             elseif part:IsA("SpecialMesh") then originalTextures[weapon.Name][part.Name]={TextureId=part.TextureId,MeshId=part.MeshId}
             elseif part:IsA("Part") then
-                local decals={}
-                for _,d in pairs(part:GetChildren()) do if d:IsA("Decal") or d:IsA("Texture") then decals[#decals+1]={class=d.ClassName,face=d.Face,texture=d.Texture} end end
+                local decals={}; for _,d in pairs(part:GetChildren()) do if d:IsA("Decal") or d:IsA("Texture") then decals[#decals+1]={class=d.ClassName,face=d.Face,texture=d.Texture} end end
                 originalTextures[weapon.Name][part.Name]={decals=decals,Color=part.Color,Material=part.Material}
             end
         end
@@ -1747,16 +1710,16 @@ tryAutoExec(function(isAdmin,tier)
                     elseif part:IsA("Part") then local sp=skinModel:FindFirstChild(part.Name,true); if sp then part.Color=sp.Color; part.Material=sp.Material; for _,d in pairs(part:GetChildren()) do if d:IsA("Decal") or d:IsA("Texture") then d:Destroy() end end; for _,d in pairs(sp:GetChildren()) do if d:IsA("Decal") or d:IsA("Texture") then d:Clone().Parent=part end end end end
                 end
                 skinStatusLabel:SetText("Status: "..skinName.." applied!")
-            else skinStatusLabel:SetText("Status: Skin not found in RS") end
+            else skinStatusLabel:SetText("Status: Skin not found") end
         end)
     end
     SkinLeftGB:AddDropdown("SkinWeaponDrop",{Values={"None"},Default=1,Multi=false,Text="Select Weapon",Callback=function(v)
         selectedWeaponName=v; if v=="None" then return end
-        local skins=getSkinsForWeapon(v); Options.SkinDrop:SetValues(skins); Options.SkinDrop:SetValue(skins[1]); skinStatusLabel:SetText("Status: "..#skins.." skins found")
+        local skins=getSkinsForWeapon(v); Options.SkinDrop:SetValues(skins); Options.SkinDrop:SetValue(skins[1]); skinStatusLabel:SetText("Status: "..#skins.." skins")
     end})
     SkinLeftGB:AddButton("Refresh Weapons",function()
         local weapons=getWeaponList(); local vals={"None"}; for _,w in pairs(weapons) do vals[#vals+1]=w end
-        Options.SkinWeaponDrop:SetValues(vals); Options.SkinWeaponDrop:SetValue(vals[1]); skinCountLabel:SetText("Weapons found: "..#weapons); Library:Notify("Found "..#weapons.." weapons",3)
+        Options.SkinWeaponDrop:SetValues(vals); Options.SkinWeaponDrop:SetValue(vals[1]); skinCountLabel:SetText("Weapons: "..#weapons); Library:Notify("Found "..#weapons.." weapons",3)
     end)
     SkinLeftGB:AddButton("Apply Skin",function()
         if selectedWeaponName=="" or selectedWeaponName=="None" then Library:Notify("Select a weapon first",3) return end
@@ -1764,12 +1727,12 @@ tryAutoExec(function(isAdmin,tier)
         applySkinToWeapon(selectedWeaponName,selectedSkinName)
     end)
     SkinLeftGB:AddButton("Restore Default",function()
-        if selectedWeaponName=="" or selectedWeaponName=="None" then Library:Notify("Select a weapon first",3) return end
+        if selectedWeaponName=="" or selectedWeaponName=="None" then Library:Notify("Select a weapon",3) return end
         applySkinToWeapon(selectedWeaponName,"Default")
     end)
-    SkinLeftGB:AddDivider(); SkinLeftGB:AddLabel("Press Refresh Weapons first.")
+    SkinLeftGB:AddDivider(); SkinLeftGB:AddLabel("Refresh first, then pick weapon.")
     SkinRightGB:AddDropdown("SkinDrop",{Values={"Default"},Default=1,Multi=false,Text="Select Skin",Callback=function(v) selectedSkinName=v end})
-    SkinRightGB:AddDivider(); SkinRightGB:AddLabel("How to use:"); SkinRightGB:AddLabel("1. Press Refresh Weapons"); SkinRightGB:AddLabel("2. Select your weapon"); SkinRightGB:AddLabel("3. Select a skin"); SkinRightGB:AddLabel("4. Press Apply Skin"); SkinRightGB:AddLabel("Client-side only")
+    SkinRightGB:AddDivider(); SkinRightGB:AddLabel("1. Refresh Weapons"); SkinRightGB:AddLabel("2. Select weapon"); SkinRightGB:AddLabel("3. Select skin"); SkinRightGB:AddLabel("4. Apply Skin"); SkinRightGB:AddLabel("Client-side only")
 
     -- ================================================
     -- UI SETTINGS
@@ -1803,7 +1766,7 @@ tryAutoExec(function(isAdmin,tier)
     LocalPlayer.CharacterAdded:Connect(function() pcall(function() SaveManager:Save("rivals_autosave") end) end)
 
     -- ================================================
-    -- INFO TAB
+    -- INFO TAB (loads async - never blocks)
     -- ================================================
     local InfoLeftGB=Tabs.Info:AddLeftGroupbox("Script Information")
     local InfoRightGB=Tabs.Info:AddRightGroupbox("Session")
@@ -1815,33 +1778,36 @@ tryAutoExec(function(isAdmin,tier)
     InfoLeftGB:AddButton("Copy Snapchat",function() setclipboard(SNAPCHAT); Library:Notify("Copied!",3) end)
     InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("Instagram: "..INSTAGRAM)
     InfoLeftGB:AddButton("Copy Instagram",function() setclipboard(INSTAGRAM); Library:Notify("Copied!",3) end)
-    InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("W / M / L keys available")
+    InfoLeftGB:AddDivider(); InfoLeftGB:AddLabel("W = Weekly | M = Monthly | L = Lifetime")
     InfoRightGB:AddLabel("Tier: "..(isAdmin and "Admin" or tier or "User"))
     InfoRightGB:AddLabel("Username: "..LocalPlayer.Name)
     InfoRightGB:AddLabel("User ID: "..tostring(LocalPlayer.UserId))
     InfoRightGB:AddDivider()
     local keyExpiryLabel=InfoRightGB:AddLabel("Key Expiry: Loading...")
-    local keyTierLabel=InfoRightGB:AddLabel("Key Tier: Loading...")
+    local keyTierLabel  =InfoRightGB:AddLabel("Key Tier:   Loading...")
     local keyStatusLabel=InfoRightGB:AddLabel("Key Status: Loading...")
     local function refreshInfoLabels()
-        if isAdmin then keyExpiryLabel:SetText("Key Expiry: N/A (Admin)"); keyTierLabel:SetText("Key Tier: Admin"); keyStatusLabel:SetText("Key Status: Active"); return end
-        if not currentUserKey then keyExpiryLabel:SetText("Key Expiry: No key"); keyTierLabel:SetText("Key Tier: None"); keyStatusLabel:SetText("Key Status: None"); return end
+        if isAdmin then keyExpiryLabel:SetText("Key Expiry: N/A (Admin)"); keyTierLabel:SetText("Key Tier:   Admin"); keyStatusLabel:SetText("Key Status: Active"); return end
+        if not currentUserKey then keyExpiryLabel:SetText("Key Expiry: No key"); keyTierLabel:SetText("Key Tier:   None"); keyStatusLabel:SetText("Key Status: None"); return end
         local ok,kd=pcall(function() return fbGet("/keys/"..currentUserKey) end)
         if ok and kd then
             local expiry=tonumber(kd.expiry) or 0
-            keyTierLabel:SetText("Key Tier: "..tostring(kd.tier or "?"))
+            keyTierLabel:SetText("Key Tier:   "..tostring(kd.tier or "?"))
             keyStatusLabel:SetText("Key Status: "..tostring(kd.status or "?"))
             if kd.tier=="Lifetime" or expiry==0 then keyExpiryLabel:SetText("Key Expiry: Never (Lifetime)")
             else
                 local secs=math.max(0,expiry-os.time())
                 if secs==0 then keyExpiryLabel:SetText("Key Expiry: EXPIRED")
-                else local d=math.floor(secs/86400); local h=math.floor((secs%86400)/3600); local m=math.floor((secs%3600)/60); keyExpiryLabel:SetText("Key Expiry: "..d.."d "..h.."h "..m.."m") end
+                else keyExpiryLabel:SetText("Key Expiry: "..math.floor(secs/86400).."d "..math.floor((secs%86400)/3600).."h "..math.floor((secs%3600)/60).."m") end
             end
-        else keyExpiryLabel:SetText("Key Expiry: Failed to load"); keyTierLabel:SetText("Key Tier: ?"); keyStatusLabel:SetText("Key Status: ?") end
+        else keyExpiryLabel:SetText("Key Expiry: Error"); keyTierLabel:SetText("Key Tier:   Error"); keyStatusLabel:SetText("Key Status: Error") end
     end
     task.spawn(function() task.wait(1.5); refreshInfoLabels() end)
     InfoRightGB:AddDivider()
-    InfoRightGB:AddButton("Refresh Info",function() keyExpiryLabel:SetText("Key Expiry: Refreshing..."); keyTierLabel:SetText("Key Tier: ..."); keyStatusLabel:SetText("Key Status: ..."); task.spawn(refreshInfoLabels) end)
+    InfoRightGB:AddButton("Refresh Info",function()
+        keyExpiryLabel:SetText("Key Expiry: ..."); keyTierLabel:SetText("Key Tier:   ..."); keyStatusLabel:SetText("Key Status: ...")
+        task.spawn(refreshInfoLabels)
+    end)
     InfoRightGB:AddDivider()
     InfoRightGB:AddButton("Logout / Change Key",function()
         clearKey(); scriptLoaded=false; accessGranted=false; featuresLocked=true
@@ -1870,10 +1836,8 @@ tryAutoExec(function(isAdmin,tier)
         if specGui then specGui:Destroy() end
         if hideLoopConn then hideLoopConn:Disconnect() end
         pcall(function() guiCapture:Disconnect() end)
-        restoreOriginalName()
-        resetMap()
-        resetSky()
-        showAllGuis()
+        resetMap(); resetSky(); showAllGuis()
+        if nameHiderEnabled then resetNameHide() end
         LocalPlayer.CameraMode=originalCameraType or Enum.CameraMode.Classic
         LocalPlayer.CameraMaxZoomDistance=originalMaxZoom or 128
         LocalPlayer.CameraMinZoomDistance=originalMinZoom or 0.5
@@ -1883,7 +1847,7 @@ tryAutoExec(function(isAdmin,tier)
     end)
 
     -- ================================================
-    -- ADMIN CHAT COMMAND
+    -- ADMIN CHAT COMMAND (/g2 to toggle menu)
     -- ================================================
     if isAdmin then
         pcall(function()
