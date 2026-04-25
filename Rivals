@@ -1,4 +1,4 @@
-================================================
+-- ================================================
 --         RIVALS - thegxx | v3.11
 --    Key System: Weekly / Monthly / Lifetime
 --    Owner: Demon Executioners
@@ -1065,18 +1065,9 @@ tryAutoExec(function(isAdmin,tier)
         local hum=getHumanoid(); if hum then hum.PlatformStand=false end
     end
 
-    -- Forward-declare mobile fly helpers so closures below can reference them
+    -- Mobile fly up/down button state + helpers (defined before any UI closures reference them)
     local mobileUpHeld=false; local mobileDownHeld=false; local mobileFlyGui=nil
-    local showMobileFlyButtons, hideMobileFlyButtons
-
-    MovementLeftGroupBox:AddSlider("FlyHackSpeed",{Text="Fly Speed",Default=50,Min=1,Max=500,Rounding=0,Callback=function(v) flySpeed=v end})
-    MovementLeftGroupBox:AddLabel("Fly Keybind"):AddKeyPicker("FlyKeybind",{Default="F",Mode="Toggle",Text="Fly Key",NoUI=false,Callback=function(v)
-        if featuresLocked then return end; flyEnabled=v; Toggles.FlyHackToggle:SetValue(v)
-        if v then startFly(); showMobileFlyButtons() else stopFly(); hideMobileFlyButtons() end
-    end})
-
-    -- Mobile fly up/down buttons (only visible on touch devices while flying)
-    showMobileFlyButtons=function()
+    local function showMobileFlyButtons()
         if not UserInputService.TouchEnabled then return end
         if mobileFlyGui then return end
         local mg=Instance.new("ScreenGui"); mg.Name="MobileFlyButtons"; mg.ResetOnSpawn=false; mg.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; mg.DisplayOrder=100; mg.Parent=game.CoreGui
@@ -1087,19 +1078,23 @@ tryAutoExec(function(isAdmin,tier)
         upBtn.MouseButton1Up:Connect(function() mobileUpHeld=false end)
         downBtn.MouseButton1Down:Connect(function() mobileDownHeld=true end)
         downBtn.MouseButton1Up:Connect(function() mobileDownHeld=false end)
-        -- TouchEnded safety reset in case finger lifts off button mid-hold
         upBtn.TouchEnded:Connect(function() mobileUpHeld=false end)
         downBtn.TouchEnded:Connect(function() mobileDownHeld=false end)
     end
-    hideMobileFlyButtons=function()
+    local function hideMobileFlyButtons()
         mobileUpHeld=false; mobileDownHeld=false
         if mobileFlyGui then mobileFlyGui:Destroy(); mobileFlyGui=nil end
     end
 
-    -- Fly toggle with mobile button support
+    -- Fly toggle (added first so Toggles.FlyHackToggle exists for keybind callback below)
     MovementLeftGroupBox:AddToggle("FlyHackToggle",{Text="Fly Hack",Default=false,Callback=function(v)
         if featuresLocked then Toggles.FlyHackToggle:SetValue(false) return end
         flyEnabled=v; if v then startFly(); showMobileFlyButtons() else stopFly(); hideMobileFlyButtons() end
+    end})
+    MovementLeftGroupBox:AddSlider("FlyHackSpeed",{Text="Fly Speed",Default=50,Min=1,Max=500,Rounding=0,Callback=function(v) flySpeed=v end})
+    MovementLeftGroupBox:AddLabel("Fly Keybind"):AddKeyPicker("FlyKeybind",{Default="F",Mode="Toggle",Text="Fly Key",NoUI=false,Callback=function(v)
+        if featuresLocked then return end; flyEnabled=v; Toggles.FlyHackToggle:SetValue(v)
+        if v then startFly(); showMobileFlyButtons() else stopFly(); hideMobileFlyButtons() end
     end})
 
     -- FIXED FLY: PC keyboard + mobile thumbstick via MoveDirection + mobile up/down buttons
