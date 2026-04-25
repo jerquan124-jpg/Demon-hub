@@ -6,6 +6,34 @@
 
 task.wait(2)
 if not game:IsLoaded() then game.Loaded:Wait() end
+-- [[ ANTI-CHEAT BYPASS LAYER ]]
+local VIRTUAL_WALK_SPEED = 16
+local VIRTUAL_VELOCITY = Vector3.zero
+local VIRTUAL_MATERIAL = Enum.Material.Plastic 
+
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+    if not checkcaller() and typeof(self) == "Instance" then
+        if self:IsA("Humanoid") and (key == "WalkSpeed" or key == "FloorMaterial") then
+            return key == "WalkSpeed" and VIRTUAL_WALK_SPEED or VIRTUAL_MATERIAL
+        elseif self:IsA("BasePart") and (key == "Velocity" or key == "AssemblyLinearVelocity") then
+            return VIRTUAL_VELOCITY
+        end
+    end
+    return oldIndex(self, key)
+end))
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if not checkcaller() then
+        if method == "GetState" and self:IsA("Humanoid") then return Enum.HumanoidStateType.Running end
+        if method == "Kick" or method == "kick" then return nil end
+    end
+    return oldNamecall(self, ...)
+end))
+
+-- [[ YOUR ORIGINAL SCRIPT CONTINUES BELOW ]]
 
 -- ================================================
 -- SERVICES
